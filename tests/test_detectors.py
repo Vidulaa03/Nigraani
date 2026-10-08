@@ -65,11 +65,18 @@ def test_login_failure_detector_thresholds_and_60_second_window():
         endpoint="/api/auth/login",
         status_code=401,
     )
+    forbidden_failures = _events(
+        5,
+        method="POST",
+        endpoint="/api/auth/login",
+        status_code=403,
+    )
 
     assert detect_login_failures(one_failure) == []
     assert detect_login_failures(six_failures)[0]["severity"] == 50
     assert detect_login_failures(twelve_failures)[0]["severity"] == 80
     assert detect_login_failures(spread_failures) == []
+    assert detect_login_failures(forbidden_failures)[0]["severity"] == 50
 
 
 def test_rate_detector_uses_ten_second_thresholds():

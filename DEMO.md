@@ -29,78 +29,65 @@ Start both the API and analyzer in separate terminal windows:
 .\run_all.bat
 ```
 
-Wait until the API is available at <http://127.0.0.1:8000/docs>. The analyzer
-checks for new events every five seconds. Keep both terminal windows open.
+The launcher reuses an API already responding at <http://127.0.0.1:8000> or
+waits up to 30 seconds for it to become ready before starting the analyzer.
+The analyzer checks for new events every five seconds and prevents a second
+instance from processing the same database.
 
 ## Rehearse normal requests
 
-Open a PowerShell terminal in the project root and send a normal request and
-an order request owned by user 101:
+Open a PowerShell terminal in the project root and run:
 
 ```powershell
-$base = "http://127.0.0.1:8000"
-curl.exe -sS "$base/"
-curl.exe -sS -H "X-User-ID: 101" "$base/api/orders/501"
+python -m simulation.attacks.normal_traffic
 ```
 
-The order response should identify user 101 as the requester and owner.
+The script sends a normal request, a user lookup, and an order request owned by
+user 101.
 
 ## Rehearse BOLA detection
 
 User 101 requests three orders owned by other users:
 
 ```powershell
-601, 602, 701 | ForEach-Object {
-    curl.exe -sS -H "X-User-ID: 101" -H "X-Forwarded-For: 10.0.0.32" `
-        "$base/api/orders/$_"
-}
+python -m simulation.attacks.bola
 ```
 
 The intentionally vulnerable API returns the orders. The analyzer should
-record a `bola_detector` detection for `10.0.0.32` and recommend `BLOCK`.
+record a `bola_detector` detection for `203.0.113.11` and recommend `BLOCK`.
 
 ## Rehearse failed-login detection
 
 Send five invalid logins from one simulated IP:
 
 ```powershell
-1..5 | ForEach-Object {
-    curl.exe -sS -o NUL -w "%{http_code}`n" -X POST `
-        -H "Content-Type: application/json" `
-        -H "X-Forwarded-For: 10.0.0.31" `
-        -d '{"username":"admin","password":"wrong"}' `
-        "$base/api/auth/login"
-}
+python -m simulation.attacks.login_bruteforce
 ```
 
-Each response should be HTTP 401. The analyzer should record a
-`login_failure_detector` detection and recommend at least `MONITOR`.
+The script sends 15 failed logins. Each response should be HTTP 401. The
+analyzer should record a
+`login_failure_detector` detection for `203.0.113.10` and recommend at least `MONITOR`.
 
 ## Rehearse ID enumeration
 
 Probe 15 sequential, nonexistent user IDs:
 
 ```powershell
-201..215 | ForEach-Object {
-    curl.exe -sS -o NUL -H "X-Forwarded-For: 10.0.0.33" `
-        "$base/api/users/$_"
-}
+python -m simulation.attacks.enumeration
 ```
 
 The analyzer should record an `enumeration_detector` detection for
-`10.0.0.33`.
+`203.0.113.12`.
 
 ## Rehearse a request-rate spike
 
 Send 30 requests in a short burst from one simulated IP:
 
 ```powershell
-1..30 | ForEach-Object {
-    curl.exe -sS -o NUL -H "X-Forwarded-For: 10.0.0.34" "$base/"
-}
+python -m simulation.attacks.rate_spike
 ```
 
-The analyzer should record a `rate_detector` detection for `10.0.0.34`.
+The analyzer should record a `rate_detector` detection for `203.0.113.13`.
 
 Wait at least six seconds after the last scenario for the analyzer to process
 the requests, then inspect the database:
@@ -114,10 +101,10 @@ Expected rule detections include:
 
 | Simulated IP | Expected detection | Expected action |
 |---|---|---|
-| `10.0.0.31` | `login_failure_detector` | At least `MONITOR` |
-| `10.0.0.32` | `bola_detector` | `BLOCK` |
-| `10.0.0.33` | `enumeration_detector` | At least `THROTTLE` |
-| `10.0.0.34` | `rate_detector` | At least `MONITOR` |
+| `203.0.113.10` | `login_failure_detector` | At least `MONITOR` |
+| `203.0.113.11` | `bola_detector` | `BLOCK` |
+| `203.0.113.12` | `enumeration_detector` | At least `THROTTLE` |
+| `203.0.113.13` | `rate_detector` | At least `MONITOR` |
 
 `X-Sim-Label` is not needed: detector and model decisions are based on request
 events and extracted features, not simulation labels.

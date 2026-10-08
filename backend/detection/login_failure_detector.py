@@ -19,7 +19,7 @@ def detect(events: list[dict]) -> list[dict]:
         for event in events
         if event.get("method") == "POST"
         and event.get("endpoint") == LOGIN_ENDPOINT
-        and event.get("status_code") == 401
+        and event.get("status_code") in {401, 403}
     ]
 
     detections = []

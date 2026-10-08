@@ -1,5 +1,7 @@
 from unittest.mock import Mock
 
+import pytest
+
 from backend import analyzer
 from backend.detection.risk_engine import compute_risk
 
@@ -201,3 +203,83 @@ def test_polling_same_event_snapshot_does_not_duplicate_processing(monkeypatch):
     login_detector.assert_called_once_with(events)
     assert persisted_detections == [detection]
     assert len(persisted_decisions) == 1
+
+
+def test_ml_only_anomaly_is_persisted_without_rule_detections(monkeypatch):
+    events = [
+        {
+            "event_id": 99,
+            "timestamp": "2026-10-08T22:30:00.000Z",
+            "ip": "10.0.0.99",
+            "user_id": None,
+            "method": "GET",
+            "endpoint": "/",
+            "endpoint_pattern": "/",
+            "resource_id": None,
+            "resource_owner_id": None,
+            "status_code": 200,
+            "response_time_ms": 10.0,
+            "sim_label": "normal",
+        }
+    ]
+    for detector in (
+        analyzer.login_failure_detector,
+        analyzer.rate_detector,
+        analyzer.enumeration_detector,
+        analyzer.bola_detector,
+    ):
+        monkeypatch.setattr(detector, "detect", Mock(return_value=[]))
+
+    persisted_detections = []
+    persisted_decisions = []
+    monkeypatch.setattr(analyzer, "get_events_since", lambda **kwargs: events)
+    monkeypatch.setattr(
+        analyzer,
+        "insert_detection",
+        lambda detection: persisted_detections.append(detection),
+    )
+    monkeypatch.setattr(
+        analyzer,
+        "insert_decision",
+        lambda decision: persisted_decisions.append(decision),
+    )
+    monkeypatch.setattr(analyzer, "score_anomalies", lambda ip_events: 80)
+
+    assert analyzer.process_new_events() == 99
+    assert persisted_detections == []
+    assert persisted_decisions == [
+        {
+            "ip": "10.0.0.99",
+            "risk_score": 48,
+            "risk_level": "MONITOR",
+            "action": "MONITOR",
+            "reasons": ["ML anomaly score 80.0"],
+            "source": "analyzer",
+        }
+    ]
+
+
+def test_run_loop_acquires_and_releases_single_instance_lock(monkeypatch):
+    lock_file = object()
+    acquire_lock = Mock(return_value=lock_file)
+    release_lock = Mock()
+    process_events = Mock(return_value=1)
+    monkeypatch.setattr(analyzer, "_acquire_single_instance_lock", acquire_lock)
+    monkeypatch.setattr(analyzer, "_release_single_instance_lock", release_lock)
+    monkeypatch.setattr(analyzer, "process_new_events", process_events)
+
+    analyzer.run_loop(interval_seconds=0, stop_after=1)
+
+    acquire_lock.assert_called_once_with()
+    process_events.assert_called_once_with(None)
+    release_lock.assert_called_once_with(lock_file)
+
+
+def test_single_instance_lock_rejects_a_second_lock(monkeypatch, tmp_path):
+    monkeypatch.setattr(analyzer, "DB_PATH", tmp_path / "demo.db")
+    lock_file = analyzer._acquire_single_instance_lock()
+    try:
+        with pytest.raises(RuntimeError, match="Another analyzer is already running"):
+            analyzer._acquire_single_instance_lock()
+    finally:
+        analyzer._release_single_instance_lock(lock_file)
