@@ -1,4 +1,4 @@
-from detection.risk_engine import compute_risk
+from backend.detection.risk_engine import compute_risk
 
 
 def test_compute_risk_allows_clean_activity():
