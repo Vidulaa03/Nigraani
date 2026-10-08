@@ -1,0 +1,24 @@
+# Python environments and bytecode
+venv/
+.venv/
+**/venv/
+**/.venv/
+__pycache__/
+*.py[cod]
+
+# Test and tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local data and logs
+*.db
+*.sqlite
+*.sqlite3
+logs/*.jsonl
+
+# Local configuration and editor files
+.env
+.env.*
+.idea/
+.vscode/
