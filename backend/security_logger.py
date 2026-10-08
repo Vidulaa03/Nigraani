@@ -1,5 +1,7 @@
 import json
 import re
+import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -10,6 +12,16 @@ LOG_DIR = Path("logs")
 LOG_FILE = LOG_DIR / "api_events.jsonl"
 
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+_event_id_lock = threading.Lock()
+_last_event_id = 0
+
+
+def _next_event_id() -> int:
+    global _last_event_id
+    with _event_id_lock:
+        _last_event_id = max(time.time_ns() // 1_000, _last_event_id + 1)
+        return _last_event_id
 
 
 def _derive_endpoint_pattern(endpoint: str) -> str:
@@ -51,7 +63,7 @@ def log_security_event(
             resource_owner_id = order.get("owner_id")
 
     event = {
-        "event_id": event_id if event_id is not None else int(datetime.now(timezone.utc).timestamp() * 1000),
+        "event_id": event_id if event_id is not None else _next_event_id(),
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "ip": ip,
         "user_id": user_id,

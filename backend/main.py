@@ -1,5 +1,5 @@
 import time
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from backend.database import ORDERS, USERS
@@ -108,7 +108,7 @@ class LoginRequest(BaseModel):
     password: str
 
 @app.post("/api/auth/login")
-def login(login_request: LoginRequest):
+def login(login_request: LoginRequest, response: Response):
 
     if login_request.username == "admin" and login_request.password == "admin123":
         return {
@@ -116,6 +116,7 @@ def login(login_request: LoginRequest):
             "message": "Login successful"
         }
 
+    response.status_code = 401
     return {
         "success": False,
         "message": "Invalid username or password"
