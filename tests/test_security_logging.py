@@ -115,8 +115,7 @@ def test_middleware_logs_requests_and_failed_login_status(monkeypatch, tmp_path)
 
     assert [status for status, _ in responses] == [200, 200, 200, 200, 401]
     assert json.loads(responses[-1][1]) == {
-        "success": False,
-        "message": "Invalid username or password",
+        "detail": "Invalid username or password",
     }
 
     events = get_events_since()
