@@ -114,7 +114,7 @@ export default function InvestigateSearchPage() {
             <span>
               Showing {events.length} of {totalCount} indexed security events
             </span>
-            <span>Click any event's "Trace" button to view its full 5-stage lifecycle</span>
+            <span>Click any event&apos;s &quot;Trace&quot; button to view its full 5-stage lifecycle</span>
           </div>
         </div>
 

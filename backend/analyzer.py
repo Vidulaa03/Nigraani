@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
+import sys
 import os
 import tempfile
 import time
@@ -26,8 +28,7 @@ from backend.metrics import (
     RISK_DECISIONS,
     RISK_SCORE,
 )
-from ml.anomaly_detector import score as score_anomalies
-from ml.features import extract_features
+from backend.ml.anomaly_detector import AnomalyDetector, ModelNotFoundError
 
 
 _DETECTORS = {
@@ -36,6 +37,34 @@ _DETECTORS = {
     "login_failure_detector",
     "rate_detector",
 }
+
+try:
+    _ANOMALY_DETECTOR: AnomalyDetector | None = AnomalyDetector()
+except ModelNotFoundError as error:
+    _ANOMALY_DETECTOR = None
+    print(f"WARNING: {error}", file=sys.stderr)
+
+_RECENT_EVENTS_BY_IP: dict[str, list[dict[str, Any]]] = {}
+
+
+def _event_timestamp(event: dict[str, Any]) -> datetime:
+    timestamp = datetime.fromisoformat(str(event["timestamp"]).replace("Z", "+00:00"))
+    return timestamp if timestamp.tzinfo is not None else timestamp.replace(tzinfo=timezone.utc)
+
+
+def _get_new_events(last_event_id: int | None) -> list[dict[str, Any]]:
+    parameters = inspect.signature(get_events_since).parameters
+    if "last_id" in parameters and "last_event_id" not in parameters:
+        return get_events_since(last_id=last_event_id)
+    return get_events_since(last_event_id=last_event_id)
+
+
+def score_anomalies(events: list[dict[str, Any]]) -> dict[str, Any] | int:
+    """Return the latest scored window, or zero if the model is unavailable."""
+    if _ANOMALY_DETECTOR is None:
+        return 0
+    result = _ANOMALY_DETECTOR.score_ip_events(events)
+    return result if result is not None else 0
 
 
 def _acquire_single_instance_lock() -> BinaryIO:
@@ -97,40 +126,53 @@ def _severity_band(severity: int) -> str:
 
 
 def process_new_events(last_event_id: int | None = None) -> int:
-    window_start = datetime.now(timezone.utc) - timedelta(seconds=60)
-    events = get_events_since(since_timestamp=window_start.isoformat())
-    new_events = [
-        event
-        for event in events
-        if last_event_id is None or int(event["event_id"]) > last_event_id
-    ]
+    events = _get_new_events(last_event_id)
+    new_events = [event for event in events
+                  if last_event_id is None or int(event["event_id"]) > last_event_id]
     if not new_events:
         return last_event_id if last_event_id is not None else 0
-
-    changed_ips = {event.get("ip", "unknown") for event in new_events}
-    detections_by_ip: dict[str, list[dict[str, Any]]] = {}
-    for detection in _detect_ip_activity(events):
-        detections_by_ip.setdefault(detection["ip"], []).append(detection)
 
     events_by_ip: dict[str, list[dict[str, Any]]] = {}
     for event in events:
         ip = event.get("ip", "unknown")
-        if ip in changed_ips:
+        if last_event_id is None or int(event["event_id"]) > last_event_id:
             events_by_ip.setdefault(ip, []).append(event)
 
+    newest_timestamp = max(_event_timestamp(event) for event in new_events)
+    window_start = newest_timestamp - timedelta(seconds=60)
+    for ip in list(_RECENT_EVENTS_BY_IP):
+        retained = [
+            event for event in _RECENT_EVENTS_BY_IP[ip]
+            if window_start <= _event_timestamp(event) <= newest_timestamp
+        ]
+        if retained:
+            _RECENT_EVENTS_BY_IP[ip] = retained
+        else:
+            del _RECENT_EVENTS_BY_IP[ip]
+
     for ip, ip_events in events_by_ip.items():
+        by_id = {
+            int(event["event_id"]): event
+            for event in [*_RECENT_EVENTS_BY_IP.get(ip, []), *ip_events]
+        }
+        window_events = sorted(by_id.values(), key=lambda event: int(event["event_id"]))
+        _RECENT_EVENTS_BY_IP[ip] = window_events
         started = time.perf_counter()
         try:
-            detections = detections_by_ip.get(ip, [])
-            features_available = not extract_features(ip_events).empty
-            ml_score = score_anomalies(ip_events)
-            if features_available:
+            detections = _detect_ip_activity(window_events)
+            ml_result = score_anomalies(window_events)
+            if isinstance(ml_result, dict):
+                ml_score = float(ml_result["ml_score"])
+                ml_is_anomalous = bool(ml_result["is_anomalous"])
                 ML_SCORE.observe(ml_score)
                 ML_CLASSIFICATIONS.labels(
-                    "anomalous" if ml_score > 0 else "normal"
+                    "anomalous" if ml_is_anomalous else "normal"
                 ).inc()
+            else:
+                ml_score = float(ml_result)
+                ml_is_anomalous = ml_score > 0
 
-            if detections or ml_score > 0:
+            if detections or ml_is_anomalous:
                 decision = compute_risk(detections, ml_score)
                 for detection in detections:
                     insert_detection(detection)

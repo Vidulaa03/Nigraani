@@ -15,12 +15,13 @@ python -m venv .venv
 python -m pip install -r backend\requirements.txt
 ```
 
-The analyzer requires a trained Isolation Forest model at
-`models\iforest.joblib`. Train it first using a JSON file containing only
-verified normal traffic:
+The analyzer uses a trained Isolation Forest model at `models\iforest.joblib`.
+Collect verified normal traffic first; the trainer selects normal windows from
+the database using their simulation labels, which are excluded from model
+features:
 
 ```powershell
-python -m ml.train_model path\to\normal_events.json
+python -m backend.ml.train_model
 ```
 
 Start both the API and analyzer in separate terminal windows:

@@ -24,11 +24,12 @@ models/*.joblib
 .idea/
 .vscode/
 # Next.js generated output and installed dependencies
-frontend/.next/
-frontend/.next-dev/
-frontend/.next-build/
-frontend/node_modules/
-frontend/out/
+Frontend/.next/
+Frontend/.next-dev/
+Frontend/.next-build/
+Frontend/node_modules/
+Frontend/out/
+Frontend/tsconfig.tsbuildinfo
 
 # Native Prometheus downloads and local time-series data (keep monitoring config)
 monitoring/*.zip
