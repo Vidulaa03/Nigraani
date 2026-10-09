@@ -115,9 +115,9 @@ export default function CommandCenterPage() {
             color="red"
           />
           <KpiCard
-            title="Blocked IPs"
+            title="BLOCK Recommendations"
             value={kpis?.blocked_requests}
-            subtext="Risk score ≥ 80"
+            subtext="Latest recommendation per IP"
             icon={Ban}
             color="red"
           />
@@ -207,14 +207,14 @@ export default function CommandCenterPage() {
           <div className="bg-[#ffffff] border border-[#e5e0d5] rounded-none p-5">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#27251f]">
-                Enforcement Actions
+                Latest Risk Recommendations
               </h3>
               <span className="text-[10px] font-sans px-2 py-0.5 rounded-none bg-emerald-500/10 text-emerald-700 border border-emerald-500/30">
                 Risk Engine
               </span>
             </div>
             <p className="text-[11px] text-[#716c60] font-sans mb-3">
-              Persisted decisions: ALLOW, MONITOR, THROTTLE, BLOCK
+              Latest per-IP recommendation: ALLOW, MONITOR, THROTTLE, or BLOCK
             </p>
             <DecisionDistributionChart
               distribution={

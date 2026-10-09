@@ -50,8 +50,8 @@ export function DecisionDistributionChart({
   if (total === 0) {
     return (
       <EmptyState
-        title="No enforcement decisions"
-        message="Waiting for analyzer risk output to register decisions."
+        title="No risk recommendations"
+        message="Waiting for analyzer risk output."
         icon={Shield}
       />
     );

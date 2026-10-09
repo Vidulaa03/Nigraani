@@ -186,6 +186,10 @@ def process_new_events(last_event_id: int | None = None) -> int:
                     "action": decision["action"],
                     "reasons": decision["reasons"],
                     "source": "analyzer",
+                    "event_ids": [
+                        int(event["event_id"])
+                        for event in window_events
+                    ],
                 }
             )
             ANALYSIS_RUNS.inc()

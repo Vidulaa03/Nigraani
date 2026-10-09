@@ -264,6 +264,7 @@ def test_ml_only_anomaly_is_persisted_without_rule_detections(monkeypatch):
             "action": "MONITOR",
             "reasons": ["ML anomaly score 80.0"],
             "source": "analyzer",
+            "event_ids": [99],
         }
     ]
 
