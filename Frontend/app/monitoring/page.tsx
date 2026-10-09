@@ -6,10 +6,9 @@ import {
   Database,
   Brain,
   Activity,
-  CheckCircle,
-  AlertTriangle,
   Layers,
   LineChart,
+  ExternalLink,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { api } from "@/lib/api";
@@ -17,9 +16,11 @@ import { SystemHealth } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import { useVisibilityInterval } from "@/lib/useVisibilityInterval";
 
+const GRAFANA_DASHBOARD_URL =
+  "http://localhost:3001/d/nigraani-overview/nigraani-7c-operations-and-detection?from=now-1h&to=now&timezone=browser&refresh=10s";
+
 export default function MonitoringPage() {
   const [health, setHealth] = useState<SystemHealth | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
   const loadHealth = async () => {
@@ -29,7 +30,6 @@ export default function MonitoringPage() {
     } catch {
       // handled
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   };
@@ -233,21 +233,43 @@ export default function MonitoringPage() {
           </div>
         </div>
 
-        {/* Future Observability Layer Section */}
-        <div className="bg-[#ffffff] border border-dashed border-[#e5e0d5] rounded-none p-8 text-center">
-          <div className="w-12 h-12 rounded-none bg-[#ffffff] border border-[#e5e0d5] flex items-center justify-center text-amber-800 mx-auto mb-3">
-            <LineChart className="w-6 h-6" />
+        {/* Grafana dashboard information and direct link */}
+        <section className="overflow-hidden border border-[#e5e0d5] bg-white">
+          <div className="flex flex-col gap-3 border-b border-[#e5e0d5] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <div className="flex items-center gap-2">
+              <LineChart className="h-4 w-4 text-amber-800" />
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#27251f]">
+                  Operations &amp; Detection
+                </h3>
+                <p className="mt-0.5 text-[11px] text-[#716c60]">
+                  Live Prometheus metrics · 10-second dashboard refresh
+                </p>
+              </div>
+            </div>
+            <a
+              href={GRAFANA_DASHBOARD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-9 items-center justify-center gap-2 border border-[#e5e0d5] px-3 py-2 text-xs text-[#464238] hover:border-amber-600 hover:bg-[#f4f1e8]"
+            >
+              Open full dashboard
+              <ExternalLink className="h-3.5 w-3.5 text-amber-800" />
+            </a>
           </div>
-          <div className="text-xs font-sans uppercase tracking-widest text-amber-800 font-bold mb-1">
-            OBSERVABILITY
+
+          <div className="flex min-h-48 flex-col items-center justify-center px-6 py-10 text-center">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center border border-[#e5e0d5] text-amber-800">
+              <LineChart className="h-6 w-6" />
+            </div>
+            <h4 className="text-sm font-medium text-[#27251f]">
+              Live operational observability
+            </h4>
+            <p className="mt-2 max-w-xl text-xs leading-5 text-[#716c60]">
+              Explore HTTP traffic and latency, status codes and errors, real detections, risk decisions, ML anomaly scores, and Prometheus target health in Grafana. The dashboard uses live metrics and refreshes every 10 seconds when opened.
+            </p>
           </div>
-          <h4 className="text-sm font-sans text-[#27251f] font-medium mb-1">
-            Grafana monitoring will be connected here.
-          </h4>
-          <p className="text-xs text-[#716c60] max-w-md mx-auto font-sans">
-            This module is reserved for the enterprise Grafana dashboard layer. Operational telemetry and Prometheus scrape endpoints will connect directly to this monitoring pane.
-          </p>
-        </div>
+        </section>
       </div>
     </AppLayout>
   );

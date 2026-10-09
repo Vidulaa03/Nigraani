@@ -2,12 +2,18 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from prometheus_client import start_http_server
 
 from backend.database import get_events_since, insert_decision, insert_detection
 from backend.ml.anomaly_detector import AnomalyDetector, ModelNotFoundError
 from detection.risk_engine import compute_risk
+from backend.metrics import (
+    ANALYSIS_DURATION, ANALYSIS_FAILURES, ANALYSIS_RUNS, DETECTIONS,
+    ML_CLASSIFICATIONS, ML_SCORE, RISK_DECISIONS, RISK_SCORE,
+)
 
 
 try:
@@ -154,24 +160,53 @@ def process_new_events(last_event_id: int | None = None) -> int:
         ]
         _RECENT_EVENTS_BY_IP[ip] = window_events
 
-        detections = _detect_ip_activity(window_events)
-        ml_result = _ANOMALY_DETECTOR.score_ip_events(window_events) if _ANOMALY_DETECTOR else None
-        ml_score = ml_result["ml_score"] if ml_result is not None else 0
+        started = time.perf_counter()
+        try:
+            detections = _detect_ip_activity(window_events)
+            ml_result = _ANOMALY_DETECTOR.score_ip_events(window_events) if _ANOMALY_DETECTOR else None
+            ml_score = ml_result["ml_score"] if ml_result is not None else 0
 
-        decision = compute_risk(detections, ml_score)
-        for detection in detections:
-            insert_detection(detection)
+            decision = compute_risk(detections, ml_score)
+            for detection in detections:
+                insert_detection(detection)
+                detector = detection.get("detector")
+                if detector in {
+                    "login_failure_detector",
+                    "rate_detector",
+                    "enumeration_detector",
+                    "bola_detector",
+                }:
+                    severity = int(detection.get("severity", 0))
+                    severity_band = (
+                        "critical" if severity >= 80 else
+                        "high" if severity >= 60 else
+                        "medium" if severity >= 30 else "low"
+                    )
+                    DETECTIONS.labels(detector, severity_band).inc()
 
-        insert_decision(
-            {
-                "ip": ip,
-                "risk_score": decision["risk_score"],
-                "risk_level": decision["risk_level"],
-                "action": decision["action"],
-                "reasons": decision["reasons"],
-                "source": "analyzer",
-            }
-        )
+            if ml_result is not None:
+                ML_SCORE.observe(float(ml_score))
+                ML_CLASSIFICATIONS.labels("anomalous" if ml_result["is_anomalous"] else "normal").inc()
+            if decision["action"] in {"ALLOW", "MONITOR", "THROTTLE", "BLOCK"}:
+                RISK_DECISIONS.labels(decision["action"]).inc()
+            RISK_SCORE.observe(decision["risk_score"])
+
+            insert_decision(
+                {
+                    "ip": ip,
+                    "risk_score": decision["risk_score"],
+                    "risk_level": decision["risk_level"],
+                    "action": decision["action"],
+                    "reasons": decision["reasons"],
+                    "source": "analyzer",
+                }
+            )
+            ANALYSIS_RUNS.inc()
+        except Exception:
+            ANALYSIS_FAILURES.inc()
+            raise
+        finally:
+            ANALYSIS_DURATION.observe(time.perf_counter() - started)
 
     return max(int(event["event_id"]) for event in events)
 
@@ -193,4 +228,5 @@ def run_loop(interval_seconds: int = 5, stop_after: int | None = None) -> None:
 
 
 if __name__ == "__main__":
+    start_http_server(port=8001, addr="127.0.0.1")
     run_loop()

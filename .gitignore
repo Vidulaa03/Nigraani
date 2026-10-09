@@ -22,3 +22,20 @@ logs/*.jsonl
 .env.*
 .idea/
 .vscode/
+
+# Next.js generated output and installed dependencies
+frontend/.next/
+frontend/.next-dev/
+frontend/.next-build/
+frontend/node_modules/
+frontend/out/
+
+# Native Prometheus downloads and local time-series data (keep monitoring config)
+monitoring/*.zip
+monitoring/prometheus-*.windows-amd64/
+monitoring/data/
+monitoring/tsdb/
+monitoring/*.log
+
+# Local Prometheus time-series database files
+data/
