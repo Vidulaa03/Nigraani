@@ -10,9 +10,10 @@ import { EmptyState } from "../cards/EmptyState";
 interface EventsTableProps {
   events: SecurityEvent[];
   isLoading?: boolean;
+  traceLabel?: string;
 }
 
-export function EventsTable({ events, isLoading = false }: EventsTableProps) {
+export function EventsTable({ events, isLoading = false, traceLabel = "Trace" }: EventsTableProps) {
   if (isLoading) {
     return (
       <div className="p-12 text-center text-xs font-sans text-[#716c60] bg-[#ffffff] border border-[#e5e0d5] rounded-none">
@@ -116,7 +117,7 @@ export function EventsTable({ events, isLoading = false }: EventsTableProps) {
                       href={`/investigate/${e.event_id}`}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-none bg-[#ffffff] hover:bg-amber-500/20 text-amber-900 border border-[#e5e0d5] hover:border-amber-500/40 text-[11px] transition-colors"
                     >
-                      <span>Trace</span>
+                      <span>{traceLabel}</span>
                       <ExternalLink className="w-3 h-3" />
                     </Link>
                   </td>

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { InvestigationTrail } from "@/lib/types";
 import { InvestigationStepper } from "./InvestigationStepper";
+import { InvestigationReportPanel } from "./InvestigationReportPanel";
 import { ActionBadge } from "../badges/ActionBadge";
 import { SeverityBadge } from "../badges/SeverityBadge";
 import { formatDateTime } from "@/lib/utils";
@@ -50,6 +51,9 @@ export function InvestigationDetail({ data }: InvestigationDetailProps) {
 
       {/* Top 5-stage Stepper */}
       <InvestigationStepper lifecycle={lifecycle} />
+
+      {/* LLM report prototype for supported enumeration and rate-spike incidents */}
+      <InvestigationReportPanel trail={data} />
 
       {/* Grid of Investigation Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

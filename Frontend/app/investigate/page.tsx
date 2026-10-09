@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, FileSearch } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { EventsTable } from "@/components/tables/EventsTable";
 import { api } from "@/lib/api";
@@ -42,7 +42,11 @@ export default function InvestigateSearchPage() {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setOffset(0);
+    if (offset !== 0) {
+      // The offset effect will load page zero; avoid issuing a duplicate request.
+      setOffset(0);
+      return;
+    }
     fetchEvents(0);
   };
 
@@ -59,6 +63,30 @@ export default function InvestigateSearchPage() {
       isRefreshing={refreshing}
     >
       <div className="space-y-6">
+        <section className="border border-violet-300 bg-white p-4 sm:p-5" aria-labelledby="report-entry-title">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-violet-300 bg-violet-50 text-violet-900">
+                <FileSearch className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 id="report-entry-title" className="text-sm font-bold uppercase tracking-wide text-[#27251f]">
+                  LLM Investigation Report
+                </h2>
+                <p className="mt-1 max-w-3xl text-xs leading-5 text-[#5d584d]">
+                  Open an event with the <strong>Trace + Report</strong> action to see its incident summary, severity, linked event IDs, evidence, possible patterns, benign explanations, uncertainty, and human-review recommendations.
+                </p>
+                <span className="mt-2 inline-flex border border-violet-300 bg-violet-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-violet-950">
+                  Demo template · not an LLM response · enumeration and rate-spike scenarios
+                </span>
+              </div>
+            </div>
+            <a href="#investigation-events" className="shrink-0 self-start border border-[#ded7ca] bg-white px-3 py-2 text-xs font-medium text-amber-900 hover:bg-[#faf9f6]">
+              Browse events
+            </a>
+          </div>
+        </section>
+
         {/* Search & Filter Toolbar */}
         <div className="bg-[#ffffff] border border-[#e5e0d5] rounded-none p-5">
           <form
@@ -119,8 +147,8 @@ export default function InvestigateSearchPage() {
         </div>
 
         {/* Events Table */}
-        <div className="space-y-3">
-          <EventsTable events={events} isLoading={loading} />
+        <div id="investigation-events" className="space-y-3">
+          <EventsTable events={events} isLoading={loading} traceLabel="Trace + Report" />
           {totalCount > 100 && (
             <nav aria-label="Event result pages" className="flex items-center justify-between border-t border-[#e5e0d5] pt-3 text-xs font-sans text-[#716c60]">
               <span>Page {Math.floor(offset / 100) + 1} of {Math.ceil(totalCount / 100)}</span>

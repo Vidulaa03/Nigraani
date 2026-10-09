@@ -73,7 +73,8 @@ export function Sidebar({ health, backendOnline, backendChecking = false, mobile
 
   useEffect(() => {
     if (!mobileViewport || !mobileOpen) return;
-    const links = sidebarRef.current?.querySelectorAll<HTMLElement>("a, button");
+    const sidebar = sidebarRef.current;
+    const links = sidebar?.querySelectorAll<HTMLElement>("a, button");
     links?.[1]?.focus();
     const keepFocusInside = (event: KeyboardEvent) => {
       if (event.key !== "Tab" || !links?.length) return;
@@ -87,8 +88,8 @@ export function Sidebar({ health, backendOnline, backendChecking = false, mobile
         first.focus();
       }
     };
-    sidebarRef.current?.addEventListener("keydown", keepFocusInside);
-    return () => sidebarRef.current?.removeEventListener("keydown", keepFocusInside);
+    sidebar?.addEventListener("keydown", keepFocusInside);
+    return () => sidebar?.removeEventListener("keydown", keepFocusInside);
   }, [mobileOpen, mobileViewport]);
 
   const isDbOk = health?.database?.status === "connected";
@@ -97,7 +98,7 @@ export function Sidebar({ health, backendOnline, backendChecking = false, mobile
   return (
     <>
     {mobileOpen && <button aria-label="Close navigation" onClick={onNavigate} className="fixed inset-0 z-30 bg-stone-950/35 backdrop-blur-[2px] md:hidden" />}
-    <aside ref={sidebarRef} aria-hidden={mobileViewport && !mobileOpen} inert={mobileViewport && !mobileOpen} className={`fixed inset-y-0 left-0 z-40 flex min-h-screen w-64 shrink-0 select-none flex-col border-r border-[#e5e0d5] bg-white transition-transform duration-200 md:sticky md:top-0 md:z-20 md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
+    <aside ref={sidebarRef} aria-hidden={mobileViewport && !mobileOpen} {...(mobileViewport && !mobileOpen ? { inert: "" as unknown as boolean } : {})} className={`fixed inset-y-0 left-0 z-40 flex min-h-screen w-64 shrink-0 select-none flex-col border-r border-[#e5e0d5] bg-white transition-transform duration-200 md:sticky md:top-0 md:z-20 md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
       {/* Brand Header - explicitly padded and never clipped */}
       <div className="p-6 pb-5 border-b border-[#e5e0d5]">
         <div className="flex items-center gap-3">
