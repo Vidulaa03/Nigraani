@@ -1,11 +1,27 @@
 from __future__ import annotations
 
 import json
+import sys
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from backend.database import get_events_since, insert_decision, insert_detection
+from backend.ml.anomaly_detector import AnomalyDetector, ModelNotFoundError
 from detection.risk_engine import compute_risk
+
+
+try:
+    _ANOMALY_DETECTOR: AnomalyDetector | None = AnomalyDetector()
+except ModelNotFoundError as exc:
+    _ANOMALY_DETECTOR = None
+    print(f"WARNING: {exc}", file=sys.stderr)
+
+_RECENT_EVENTS_BY_IP: dict[str, list[dict[str, Any]]] = {}
+
+
+def _event_timestamp(event: dict[str, Any]) -> datetime:
+    timestamp = datetime.fromisoformat(str(event["timestamp"]).replace("Z", "+00:00"))
+    return timestamp if timestamp.tzinfo is not None else timestamp.replace(tzinfo=timezone.utc)
 
 
 def _summarize_ip_events(events: list[dict[str, Any]]) -> dict[str, Any]:
@@ -124,13 +140,23 @@ def process_new_events(last_event_id: int | None = None) -> int:
         events_by_ip.setdefault(event.get("ip", "unknown"), []).append(event)
 
     for ip, ip_events in events_by_ip.items():
-        detections = _detect_ip_activity(ip_events)
-        if not detections:
-            continue
+        events_by_id = {
+            int(event["event_id"]): event
+            for event in [*_RECENT_EVENTS_BY_IP.get(ip, []), *ip_events]
+        }
+        candidates = list(events_by_id.values())
+        newest_timestamp = max(map(_event_timestamp, ip_events))
+        window_start = newest_timestamp - timedelta(seconds=60)
+        window_events = [
+            event
+            for event in candidates
+            if window_start <= _event_timestamp(event) <= newest_timestamp
+        ]
+        _RECENT_EVENTS_BY_IP[ip] = window_events
 
-        ml_score = 0
-        if any(event.get("sim_label") not in {"normal", None} for event in ip_events):
-            ml_score = 70 if any(event.get("sim_label") in {"login_bruteforce", "rate_spike", "bola"} for event in ip_events) else 55
+        detections = _detect_ip_activity(window_events)
+        ml_result = _ANOMALY_DETECTOR.score_ip_events(window_events) if _ANOMALY_DETECTOR else None
+        ml_score = ml_result["ml_score"] if ml_result is not None else 0
 
         decision = compute_risk(detections, ml_score)
         for detection in detections:

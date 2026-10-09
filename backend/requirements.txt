@@ -1,3 +1,9 @@
 fastapi
 uvicorn[standard]
 pydantic
+scikit-learn==1.5.1
+joblib
+numpy
+streamlit
+pandas
+plotly
