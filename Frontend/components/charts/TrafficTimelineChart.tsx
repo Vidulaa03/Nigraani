@@ -103,13 +103,16 @@ export function TrafficTimelineChart({
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#27251f",
+              backgroundColor: "#ffffff",
               borderColor: "#ded7ca",
               borderRadius: "0",
               fontSize: "12px",
               fontFamily: "monospace",
               color: "#27251f",
+              boxShadow: "0 6px 18px rgba(39, 37, 31, 0.12)",
             }}
+            labelStyle={{ color: "#716c60", marginBottom: "4px" }}
+            itemStyle={{ color: "#27251f" }}
           />
           <Area
             type="monotone"
