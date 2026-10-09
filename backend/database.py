@@ -22,12 +22,12 @@ USERS = {
         "email": "vidula@example.com",
     },
     104: {
-        "name": "Riya",
-        "email": "riya@example.com",
+        "name": "Shravani",
+        "email": "shravani@example.com",
     },
     105: {
-        "name": "Aarav",
-        "email": "aarav@example.com",
+        "name": "xyz",
+        "email": "xyz@example.com",
     },
 }
 
@@ -73,6 +73,29 @@ ORDERS = {
         "amount": 1200,
     },
 }
+
+_DEMO_ORDER_CATALOG = (
+    ("Notebook", 2500),
+    ("Desk lamp", 1800),
+    ("Backpack", 3200),
+    ("Water bottle", 700),
+    ("USB hub", 1100),
+    ("Webcam", 4500),
+    ("Microphone", 5200),
+    ("Office chair", 12500),
+)
+
+for user_offset, user_id in enumerate(USERS):
+    existing_orders = sum(order["owner_id"] == user_id for order in ORDERS.values())
+    for order_number, (product, amount) in enumerate(
+        _DEMO_ORDER_CATALOG[: 8 - existing_orders],
+        start=1,
+    ):
+        ORDERS[1000 + user_offset * 100 + order_number] = {
+            "owner_id": user_id,
+            "product": product,
+            "amount": amount,
+        }
 
 
 def get_connection() -> sqlite3.Connection:
@@ -166,13 +189,23 @@ def init_db() -> Path:
     return DB_PATH
 
 
-def get_events_since(last_event_id: int | None = None, limit: int | None = None) -> list[dict[str, Any]]:
+def get_events_since(
+    last_event_id: int | None = None,
+    limit: int | None = None,
+    since_timestamp: str | None = None,
+) -> list[dict[str, Any]]:
     with get_connection() as conn:
         query = "SELECT * FROM security_events"
         params: list[Any] = []
+        conditions = []
         if last_event_id is not None:
-            query += " WHERE event_id > ?"
+            conditions.append("event_id > ?")
             params.append(last_event_id)
+        if since_timestamp is not None:
+            conditions.append("julianday(timestamp) >= julianday(?)")
+            params.append(since_timestamp)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
         query += " ORDER BY event_id ASC"
         if limit is not None:
             query += " LIMIT ?"

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"grep -rnE \\\"\\\\[\\\\\\\"detector\\\\\\\"\\\\]|\\\\\\\"detector\\\\\\\":|_detector\\\\\\\"|'detector'\\\" tests | grep -v \\\"test_risk_engine\\\\|test_analyzer_integration\\\"; grep -rn \\\"detector\\\" backend/detection/ri...",
+  "error": "Exit code 1\ntests/test_analyzer.py:109:        row[\"detector\"] == \"login_failure_detector\" and row[\"ip\"] == \"10.0.0.3\"\ntests/test_analyzer.py:113:        row[\"detector\"] == \"bola_detector\"\ntests/test_detectors.py:140:        \"bola_detector\",\ntests/test_detectors.py:141:        \"enumeration_detector\",\ntests/test_detectors.py:142:        \"login_failure_detector\",\ntests/test_detectors.py:143:        \"rate_detector\",\ntests/test_owasp_map.py:8:    \"bola_detector\",\ntests/test_owasp_map.py:10:    \"enum...",
+  "timestamp": "2026-10-08T19:39:50.513Z",
+  "retry_count": 1
+}

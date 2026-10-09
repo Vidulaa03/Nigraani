@@ -8,3 +8,4 @@ streamlit
 pandas
 plotly
 prometheus-client>=0.20,<1
+joblib

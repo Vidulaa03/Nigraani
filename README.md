@@ -24,11 +24,36 @@ uvicorn backend.main:app --reload
 
 The API documentation is available at <http://127.0.0.1:8000/docs>.
 
+## Demo rehearsal
+
+After training the anomaly model, use [`DEMO.md`](./DEMO.md) for the
+end-to-end scenarios and run `.\run_all.bat` to start the API and analyzer in
+separate terminal windows.
+
 ## Tests
 
 ```powershell
 python -m pip install pytest
 python -m pytest
+```
+
+## Train the anomaly model
+
+Collect normal API traffic, then save an event JSON file containing only
+verified normal events. Do not use attack traffic in the training file.
+
+```powershell
+python -m ml.train_model path\to\normal_events.json
+```
+
+The analyzer uses the saved model at `models\iforest.joblib` and reports a
+clear error if it has not been trained. Event labels are not used by detectors,
+feature extraction, training, or inference.
+
+After training, run the analyzer in a separate terminal:
+
+```powershell
+python -m backend.analyzer
 ```
 
 ## Demo warning
