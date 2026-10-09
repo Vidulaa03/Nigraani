@@ -250,3 +250,29 @@ export interface InvestigationTrail {
   } | null;
   lifecycle: InvestigationLifecycleStage[];
 }
+
+export interface GeminiEvidenceObservation {
+  observation: string;
+  significance: string;
+}
+
+export interface GeminiInvestigationReport {
+  incident_summary: string;
+  likely_attack_type: string;
+  severity: "low" | "medium" | "high" | "critical";
+  evidence: GeminiEvidenceObservation[];
+  confidence: number;
+  recommended_actions: string[];
+  limitations: string[];
+}
+
+export interface IncidentInvestigation {
+  investigation_id: string;
+  detection_id: number;
+  status: "pending" | "in_progress" | "completed" | "failed";
+  result: GeminiInvestigationReport | null;
+  model_id: string;
+  created_at: string;
+  completed_at: string | null;
+  error_code: string | null;
+}

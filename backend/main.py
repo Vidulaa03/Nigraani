@@ -8,6 +8,7 @@ from starlette.responses import Response
 from backend.database import ORDERS, USERS
 from backend.security_logger import log_security_event
 from backend.dashboard_api import router as dashboard_router
+from backend.gemini_api import router as gemini_router
 from backend.metrics import HTTP_DURATION, HTTP_REQUESTS, route_label
 
 app = FastAPI(
@@ -25,6 +26,7 @@ app.add_middleware(
 )
 
 app.include_router(dashboard_router, prefix="/api/dashboard")
+app.include_router(gemini_router)
 
 
 @app.middleware("http")
