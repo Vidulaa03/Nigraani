@@ -1,6 +1,10 @@
 fastapi
 uvicorn[standard]
 pydantic
-pandas
-scikit-learn
+scikit-learn==1.5.1
 joblib
+numpy
+streamlit
+pandas
+plotly
+prometheus-client>=0.20,<1

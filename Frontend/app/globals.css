@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --font-sans: Inter, "Segoe UI Variable", "Segoe UI", Aptos, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --bg: #f7f5ef;
+  --panel: #ffffff;
+  --panel-light: #f4f1e8;
+  --border: #e5e0d5;
+  --border-subtle: #eeeae1;
+  --text: #27251f;
+  --muted: #716c60;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  overflow-x: hidden;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f0ede5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c7bfae;
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a99365;
+}
+
+* { scrollbar-color: #c7bfae #f0ede5; }
+
+*, *::before, *::after {
+  border-radius: 0 !important;
+}
+
+:focus-visible {
+  outline: 3px solid #bd7b12;
+  outline-offset: 2px;
+}
+
+button, a, input, select, textarea {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+  transition-duration: 160ms;
+  transition-timing-function: cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

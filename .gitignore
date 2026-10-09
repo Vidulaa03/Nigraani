@@ -23,5 +23,9 @@ models/*.joblib
 .env.*
 .idea/
 .vscode/
-# Claude / development tool state
-.omc/
+
+Frontend/tsconfig.tsbuildinfo
+
+Frontend/node_modules/
+Frontend/.next-build/
+Frontend/.next/
