@@ -169,10 +169,19 @@ def test_polling_same_event_snapshot_does_not_duplicate_processing(monkeypatch):
 
     persisted_detections = []
     persisted_decisions = []
+
+    def get_events_after_cursor(**kwargs):
+        last_event_id = kwargs.get("last_event_id")
+        return [
+            event
+            for event in events
+            if last_event_id is None or int(event["event_id"]) > last_event_id
+        ]
+
     monkeypatch.setattr(
         analyzer,
         "get_events_since",
-        lambda **kwargs: events,
+        get_events_after_cursor,
     )
     monkeypatch.setattr(
         analyzer,
