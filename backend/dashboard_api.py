@@ -79,6 +79,49 @@ def _parse_event_ids(raw: Any) -> list[int]:
     return result
 
 
+def _unique_detections(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    unique: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for row in rows:
+        event_ids = tuple(sorted(set(_parse_event_ids(row.get("event_ids")))))
+        if not event_ids:
+            key = ("unlinked", row.get("detection_id"))
+        else:
+            key = (
+                row.get("detector"),
+                row.get("attack_type"),
+                row.get("ip"),
+                row.get("user_id"),
+                event_ids,
+            )
+        unique.setdefault(key, row)
+    return sorted(unique.values(), key=lambda row: row.get("detection_id", 0))
+
+
+def _unique_decisions(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    unique: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for row in rows:
+        event_ids = _parse_json(row.get("event_ids"))
+        if isinstance(event_ids, list) and event_ids:
+            key = (
+                "window",
+                row.get("ip"),
+                tuple(sorted(set(_parse_event_ids(event_ids)))),
+                row.get("source"),
+            )
+        else:
+            key = (
+                "legacy",
+                row.get("ip"),
+                row.get("risk_score"),
+                row.get("risk_level"),
+                row.get("action"),
+                json.dumps(_parse_json(row.get("reasons"), []), sort_keys=True),
+                row.get("source"),
+            )
+        unique[key] = row
+    return sorted(unique.values(), key=lambda row: row.get("decision_id", 0))
+
+
 def _severity_band(score: Any) -> str:
     try:
         val = float(score)
@@ -103,9 +146,17 @@ def get_health() -> dict[str, Any]:
     last_event_ts = None
     try:
         with get_connection() as conn:
-            for table in ("security_events", "detections", "decisions", "users", "orders"):
+            for table in ("security_events", "users", "orders"):
                 n = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
                 counts[table] = n
+            detections = [
+                dict(row) for row in conn.execute("SELECT * FROM detections").fetchall()
+            ]
+            decisions = [
+                dict(row) for row in conn.execute("SELECT * FROM decisions").fetchall()
+            ]
+            counts["detections"] = len(_unique_detections(detections))
+            counts["decisions"] = len(_unique_decisions(decisions))
             last_ev = conn.execute("SELECT timestamp FROM security_events ORDER BY event_id DESC LIMIT 1").fetchone()
             if last_ev:
                 last_event_ts = last_ev["timestamp"]
@@ -146,8 +197,12 @@ def get_health() -> dict[str, Any]:
 def get_summary() -> dict[str, Any]:
     with get_connection() as conn:
         events = [dict(r) for r in conn.execute("SELECT * FROM security_events ORDER BY event_id ASC").fetchall()]
-        detections = [dict(r) for r in conn.execute("SELECT * FROM detections ORDER BY detection_id ASC").fetchall()]
-        decisions = [dict(r) for r in conn.execute("SELECT * FROM decisions ORDER BY decision_id ASC").fetchall()]
+        detections = _unique_detections(
+            [dict(r) for r in conn.execute("SELECT * FROM detections ORDER BY detection_id ASC").fetchall()]
+        )
+        decisions = _unique_decisions(
+            [dict(r) for r in conn.execute("SELECT * FROM decisions ORDER BY decision_id ASC").fetchall()]
+        )
 
     det = get_detector()
     ml_windows = []
@@ -195,7 +250,11 @@ def get_summary() -> dict[str, Any]:
             "source": top.get("source"),
         }
 
-    blocked_count = sum(1 for d in decisions if str(d.get("action", "")).upper() == "BLOCK")
+    blocked_count = sum(
+        1
+        for d in latest_by_ip.values()
+        if str(d.get("action", "")).upper() == "BLOCK"
+    )
 
     events_by_id = {int(e["event_id"]): e for e in events}
     recent_detections = []
@@ -373,9 +432,13 @@ def get_traffic() -> dict[str, Any]:
 @router.get("/threats")
 def get_threats() -> dict[str, Any]:
     with get_connection() as conn:
-        detections = [dict(r) for r in conn.execute("SELECT * FROM detections ORDER BY detection_id ASC").fetchall()]
+        detections = _unique_detections(
+            [dict(r) for r in conn.execute("SELECT * FROM detections ORDER BY detection_id ASC").fetchall()]
+        )
         events = [dict(r) for r in conn.execute("SELECT * FROM security_events").fetchall()]
-        decisions = [dict(r) for r in conn.execute("SELECT * FROM decisions ORDER BY decision_id ASC").fetchall()]
+        decisions = _unique_decisions(
+            [dict(r) for r in conn.execute("SELECT * FROM decisions ORDER BY decision_id ASC").fetchall()]
+        )
 
     if not detections:
         return {
@@ -690,13 +753,16 @@ def investigate_event(event_id: int) -> dict[str, Any]:
             raise HTTPException(status_code=404, detail=f"Event ID {event_id} not found")
         event = dict(ev_row)
 
-        all_detections = [dict(r) for r in conn.execute("SELECT * FROM detections").fetchall()]
+        all_detections = _unique_detections(
+            [dict(r) for r in conn.execute("SELECT * FROM detections").fetchall()]
+        )
         all_decisions = [
             dict(r)
             for r in conn.execute(
-                "SELECT * FROM decisions WHERE ip = ? ORDER BY decision_id DESC", (event["ip"],)
+                "SELECT * FROM decisions WHERE ip = ? ORDER BY decision_id ASC", (event["ip"],)
             ).fetchall()
         ]
+        all_decisions = _unique_decisions(all_decisions)
         all_events = [dict(r) for r in conn.execute("SELECT * FROM security_events").fetchall()]
 
     uid = event.get("user_id")
@@ -733,7 +799,7 @@ def investigate_event(event_id: int) -> dict[str, Any]:
 
     latest_decision = None
     if all_decisions:
-        top = all_decisions[0]
+        top = all_decisions[-1]
         latest_decision = {
             "decision_id": top.get("decision_id"),
             "risk_score": top.get("risk_score"),

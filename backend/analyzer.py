@@ -209,6 +209,7 @@ def process_new_events(last_event_id: int | None = None) -> int:
                         "action": decision["action"],
                         "reasons": decision["reasons"],
                         "source": "analyzer",
+                        "event_ids": sorted({int(event["event_id"]) for event in window_events}),
                     }
                 )
                 RISK_DECISIONS.labels(str(decision["action"])).inc()

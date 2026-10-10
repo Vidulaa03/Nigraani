@@ -1,3 +1,4 @@
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
@@ -7,6 +8,25 @@ from backend.detection.base import validate_event
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "demo.db"
+
+
+def _analysis_key(*parts: Any) -> str:
+    payload = json.dumps(parts, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _canonical_event_ids(event_ids: Any) -> list[int] | None:
+    if isinstance(event_ids, str):
+        try:
+            event_ids = json.loads(event_ids)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(event_ids, list) or not event_ids:
+        return None
+    try:
+        return sorted({int(event_id) for event_id in event_ids})
+    except (TypeError, ValueError):
+        return None
 
 USERS = {
     101: {
@@ -154,7 +174,8 @@ def init_db() -> Path:
                 user_id INTEGER,
                 evidence TEXT NOT NULL,
                 event_ids TEXT NOT NULL,
-                owasp TEXT NOT NULL DEFAULT 'API1:2023'
+                owasp TEXT NOT NULL DEFAULT 'API1:2023',
+                analysis_key TEXT
             )
             """
         )
@@ -167,10 +188,30 @@ def init_db() -> Path:
                 risk_level TEXT NOT NULL,
                 action TEXT NOT NULL,
                 reasons TEXT NOT NULL,
-                source TEXT NOT NULL DEFAULT 'system'
+                source TEXT NOT NULL DEFAULT 'system',
+                event_ids TEXT,
+                analysis_key TEXT
             )
             """
         )
+        detection_columns = {row["name"] for row in conn.execute("PRAGMA table_info(detections)")}
+        if "analysis_key" not in detection_columns:
+            conn.execute("ALTER TABLE detections ADD COLUMN analysis_key TEXT")
+
+        decision_columns = {row["name"] for row in conn.execute("PRAGMA table_info(decisions)")}
+        if "event_ids" not in decision_columns:
+            conn.execute("ALTER TABLE decisions ADD COLUMN event_ids TEXT")
+        if "analysis_key" not in decision_columns:
+            conn.execute("ALTER TABLE decisions ADD COLUMN analysis_key TEXT")
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_detections_analysis_key "
+            "ON detections (analysis_key) WHERE analysis_key IS NOT NULL"
+        )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_decisions_analysis_key "
+            "ON decisions (analysis_key) WHERE analysis_key IS NOT NULL"
+        )
+
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS notifications (
@@ -319,17 +360,37 @@ def insert_event(event: dict[str, Any]) -> int:
 
 
 def insert_detection(detection: dict[str, Any]) -> int:
-    if "event_ids" in detection and not isinstance(detection["event_ids"], str):
-        evidence_payload = json.dumps(detection["event_ids"])
-    else:
-        evidence_payload = detection.get("event_ids", "[]")
-
+    event_ids = detection.get("event_ids", [])
+    canonical_event_ids = _canonical_event_ids(event_ids)
+    evidence_payload = event_ids if isinstance(event_ids, str) else json.dumps(event_ids)
+    key = (
+        _analysis_key(
+            detection["detector"], detection["attack_type"], detection["ip"],
+            detection.get("user_id"), canonical_event_ids,
+        )
+        if canonical_event_ids is not None else None
+    )
     with get_connection() as conn:
+        if key is not None:
+            existing = conn.execute(
+                "SELECT detection_id FROM detections WHERE analysis_key = ?", (key,)
+            ).fetchone()
+            if existing:
+                return int(existing["detection_id"])
+            legacy_rows = conn.execute(
+                """SELECT detection_id, event_ids FROM detections
+                   WHERE detector = ? AND ip = ? AND attack_type = ?
+                     AND user_id IS ? AND analysis_key IS NULL""",
+                (detection["detector"], detection["ip"], detection["attack_type"], detection.get("user_id")),
+            ).fetchall()
+            for row in legacy_rows:
+                if _canonical_event_ids(row["event_ids"]) == canonical_event_ids:
+                    return int(row["detection_id"])
         cursor = conn.execute(
             """
             INSERT INTO detections (
-                detector, attack_type, severity, ip, user_id, evidence, event_ids, owasp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                detector, attack_type, severity, ip, user_id, evidence, event_ids, owasp, analysis_key
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 detection["detector"],
@@ -340,6 +401,7 @@ def insert_detection(detection: dict[str, Any]) -> int:
                 detection["evidence"],
                 evidence_payload,
                 detection.get("owasp", "API1:2023"),
+                key,
             ),
         )
         conn.commit()
@@ -348,11 +410,23 @@ def insert_detection(detection: dict[str, Any]) -> int:
 
 def insert_decision(decision: dict[str, Any]) -> int:
     reasons_payload = json.dumps(decision.get("reasons", []))
+    canonical_event_ids = _canonical_event_ids(decision.get("event_ids"))
+    event_ids_payload = json.dumps(canonical_event_ids, separators=(",", ":")) if canonical_event_ids else None
+    key = (
+        _analysis_key(decision["ip"], decision.get("source", "system"), canonical_event_ids)
+        if canonical_event_ids is not None else None
+    )
     with get_connection() as conn:
+        if key is not None:
+            existing = conn.execute(
+                "SELECT decision_id FROM decisions WHERE analysis_key = ?", (key,)
+            ).fetchone()
+            if existing:
+                return int(existing["decision_id"])
         cursor = conn.execute(
             """
-            INSERT INTO decisions (ip, risk_score, risk_level, action, reasons, source)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO decisions (ip, risk_score, risk_level, action, reasons, source, event_ids, analysis_key)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 decision["ip"],
@@ -361,6 +435,8 @@ def insert_decision(decision: dict[str, Any]) -> int:
                 decision["action"],
                 reasons_payload,
                 decision.get("source", "system"),
+                event_ids_payload,
+                key,
             ),
         )
         conn.commit()
@@ -622,4 +698,4 @@ def get_calls_for_incident(incident_id: str) -> list[dict[str, Any]]:
     return items
 
 
-init_db()
+init_db()
