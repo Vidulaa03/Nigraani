@@ -16,7 +16,13 @@ try:
 except ImportError:
     pass
 
-from backend.database import DB_PATH, get_events_since, insert_decision, insert_detection
+from backend.database import (
+    DB_PATH,
+    get_events_since,
+    get_latest_event_id,
+    insert_decision,
+    insert_detection,
+)
 from backend.detection import (
     bola_detector,
     enumeration_detector,
@@ -241,7 +247,9 @@ def process_new_events(last_event_id: int | None = None) -> int:
 def run_loop(interval_seconds: int = 5, stop_after: int | None = None) -> None:
     lock_file = _acquire_single_instance_lock()
     try:
-        last_event_id = None
+        # Existing rows are historical telemetry. Reprocessing them on every
+        # restart can duplicate detections and trigger repeated voice calls.
+        last_event_id = get_latest_event_id()
         iterations = 0
         while True:
             if stop_after is not None and iterations >= stop_after:

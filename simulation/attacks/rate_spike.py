@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -41,6 +42,7 @@ def send_burst(
     print(f"Max Window:        {window_seconds}s")
     print(f"-----------------------------------------------------------------")
 
+    run_started_at = datetime.now(timezone.utc)
     start_time = time.perf_counter()
 
     for i in range(1, count + 1):
@@ -79,15 +81,22 @@ def send_burst(
         "call_status": None,
     }
 
-    # Give analyzer up to 6 seconds to run its 5-second cycle
-    for poll_attempt in range(6):
+    # Only count telemetry created by this burst; old records for the same
+    # demo IP must not make a new run appear to have succeeded or failed.
+    run_started_iso = run_started_at.isoformat()
+    # Give the analyzer up to 16 seconds to run and persist its next cycle.
+    for poll_attempt in range(16):
         time.sleep(1)
         try:
             threats_req = Request(f"{target.rstrip('/')}/api/dashboard/threats")
             with urlopen(threats_req, timeout=3) as t_resp:
                 t_data = json.loads(t_resp.read().decode())
                 for d in t_data.get("detections", []):
-                    if d.get("ip") == ip and d.get("detector") == "rate_detector":
+                    if (
+                        d.get("ip") == ip
+                        and d.get("detector") == "rate_detector"
+                        and (d.get("linked_timestamp") or "") >= run_started_iso
+                    ):
                         verification["rate_detection_found"] = True
                         break
 
@@ -95,7 +104,10 @@ def send_burst(
             with urlopen(notif_req, timeout=3) as n_resp:
                 n_data = json.loads(n_resp.read().decode())
                 for n in n_data.get("notifications", []):
-                    if ip in n.get("title", "") or ip in n.get("message", ""):
+                    if (
+                        (ip in n.get("title", "") or ip in n.get("message", ""))
+                        and n.get("created_at", "") >= run_started_iso
+                    ):
                         verification["notification_found"] = True
                         break
 
@@ -104,19 +116,23 @@ def send_burst(
                 c_data = json.loads(c_resp.read().decode())
                 for c in c_data.get("calls", []):
                     meta = c.get("metadata", {})
-                    if meta.get("ip") == ip or ip in c.get("trigger_reason", ""):
+                    if (
+                        (meta.get("ip") == ip or ip in c.get("trigger_reason", ""))
+                        and c.get("initiated_at", "") >= run_started_iso
+                    ):
                         verification["call_found"] = True
                         verification["call_status"] = c.get("status")
                         break
 
-            if verification["rate_detection_found"]:
+            if verification["rate_detection_found"] and verification["call_found"]:
                 break
         except Exception:
             pass
 
     print(f"Rate Detection:    {'[CONFIRMED]' if verification['rate_detection_found'] else '[PENDING ANALYZER CYCLE]'}")
     print(f"In-App Alert:      {'[PERSISTED]' if verification['notification_found'] else '[PENDING]'}")
-    print(f"Twilio Voice Call: {'[' + str(verification['call_status']).upper() + ']' if verification['call_found'] else '[CHECKING CONFIG]'}")
+    call_result = f"[{str(verification['call_status']).upper()}]" if verification["call_found"] else "[NO NEW CALL]"
+    print(f"Twilio Voice Call: {call_result}")
     print(f"=================================================================\n")
 
     return {

@@ -281,6 +281,13 @@ def get_events_since(
     return [dict(row) for row in rows]
 
 
+def get_latest_event_id() -> int:
+    """Return the current event cursor without loading the event history."""
+    with get_connection() as conn:
+        row = conn.execute("SELECT COALESCE(MAX(event_id), 0) AS event_id FROM security_events").fetchone()
+    return int(row["event_id"])
+
+
 def insert_event(event: dict[str, Any]) -> int:
     validate_event(event)
     event_id = int(event["event_id"])
