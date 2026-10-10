@@ -1,6 +1,36 @@
 from __future__ import annotations
 
+import ipaddress
+import math
+import re
+from datetime import datetime
 from typing import Any, Iterable
+
+# SQLite INTEGER upper bound; larger values make inserts raise OverflowError.
+MAX_IDENTIFIER = 2**63 - 1
+MAX_ENDPOINT_LENGTH = 512
+HTTP_METHODS = frozenset(
+    {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE", "CONNECT"}
+)
+# Stored when no valid client address is known (no client, or a non-IP host
+# such as Starlette's TestClient "testclient").
+UNKNOWN_IP = "unknown"
+# Simulation scenarios (simulation/attacks/*), the Gemini incident fixtures,
+# and "unknown" for labels that are absent from this list. Only "normal"
+# traffic is used for ML training, so unknown labels never reach the model.
+SIM_LABELS = frozenset(
+    {
+        "normal",
+        "login_bruteforce",
+        "bola",
+        "enumeration",
+        "rate_spike",
+        "low_slow",
+        "sql_injection",
+        "unknown",
+    }
+)
+_CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 
 EVENT_REQUIRED_FIELDS = (
     "event_id",
@@ -24,23 +54,86 @@ DETECTION_REQUIRED_FIELDS = (
 )
 
 
+def _is_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _check_identifier(event: dict[str, Any], field: str, *, nullable: bool) -> None:
+    value = event.get(field)
+    if value is None and nullable:
+        return
+    if not _is_int(value) or not 0 <= value <= MAX_IDENTIFIER:
+        raise ValueError(f"{field} must be an integer between 0 and {MAX_IDENTIFIER}")
+
+
+def _check_path(event: dict[str, Any], field: str) -> None:
+    value = event[field]
+    if (
+        not isinstance(value, str)
+        or not value.startswith("/")
+        or len(value) > MAX_ENDPOINT_LENGTH
+        or _CONTROL_CHARACTERS.search(value)
+    ):
+        raise ValueError(
+            f"{field} must be a path starting with '/', at most "
+            f"{MAX_ENDPOINT_LENGTH} characters, without control characters"
+        )
+
+
+def is_valid_ip(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    return True
+
+
 def validate_event(event: dict[str, Any]) -> dict[str, Any]:
     """Validate a security event against the project contract."""
     missing = [field for field in EVENT_REQUIRED_FIELDS if field not in event]
     if missing:
         raise ValueError(f"Event missing required fields: {missing}")
 
-    if not isinstance(event["event_id"], int):
-        raise ValueError("event_id must be an integer")
+    if not _is_int(event["event_id"]) or not 1 <= event["event_id"] <= MAX_IDENTIFIER:
+        raise ValueError(f"event_id must be an integer between 1 and {MAX_IDENTIFIER}")
+    for field in ("user_id", "resource_id", "resource_owner_id"):
+        _check_identifier(event, field, nullable=True)
 
-    if not isinstance(event["status_code"], int):
-        raise ValueError("status_code must be an integer")
+    timestamp = event["timestamp"]
+    try:
+        parsed = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00"))
+    except ValueError:
+        parsed = None
+    if not isinstance(timestamp, str) or parsed is None or parsed.tzinfo is None:
+        raise ValueError("timestamp must be an ISO-8601 string with a timezone")
 
-    if not isinstance(event["response_time_ms"], (int, float)):
-        raise ValueError("response_time_ms must be numeric")
+    if event["ip"] != UNKNOWN_IP and not is_valid_ip(event["ip"]):
+        raise ValueError(f"ip must be an IPv4/IPv6 address or {UNKNOWN_IP!r}")
 
+    if event["method"] not in HTTP_METHODS:
+        raise ValueError(f"method must be one of {sorted(HTTP_METHODS)}")
+
+    _check_path(event, "endpoint")
     if event["endpoint_pattern"] is None:
         raise ValueError("endpoint_pattern cannot be null")
+    _check_path(event, "endpoint_pattern")
+
+    if not _is_int(event["status_code"]) or not 100 <= event["status_code"] <= 599:
+        raise ValueError("status_code must be an integer between 100 and 599")
+
+    response_time_ms = event["response_time_ms"]
+    if (
+        not isinstance(response_time_ms, (int, float))
+        or isinstance(response_time_ms, bool)
+        or not math.isfinite(response_time_ms)
+        or response_time_ms < 0
+    ):
+        raise ValueError("response_time_ms must be a finite, non-negative number")
+
+    if event["sim_label"] not in SIM_LABELS:
+        raise ValueError(f"sim_label must be one of {sorted(SIM_LABELS)}")
 
     return event
 

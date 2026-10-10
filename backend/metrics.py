@@ -38,6 +38,26 @@ ML_SCORE = Histogram(
 ML_CLASSIFICATIONS = Counter(
     "nigraani_ml_classifications_total", "Model classifications for scored windows.", ("classification",)
 )
+SECURITY_EVENTS = Counter(
+    "nigraani_security_events_total",
+    "Security events handled by the logging pipeline: stored, rejected (invalid or duplicate), or failed.",
+    ("outcome",),
+)
+SECURITY_LOG_WRITE_FAILURES = Counter(
+    "nigraani_security_log_write_failures_total",
+    "Failed security event writes by destination (database or jsonl).",
+    ("sink",),
+)
+SECURITY_EVENT_SPOOL = Counter(
+    "nigraani_security_event_spool_total",
+    "Recovery spool activity: queued, spool_full, spool_failed, replayed, already_present, requeued, quarantined.",
+    ("result",),
+)
+SECURITY_EVENT_FIELDS_SANITIZED = Counter(
+    "nigraani_security_event_fields_sanitized_total",
+    "Untrusted request values replaced or trimmed before logging, by field.",
+    ("field",),
+)
 
 
 def route_label(request) -> str:

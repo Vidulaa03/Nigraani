@@ -29,7 +29,9 @@ if not exist "models\iforest.joblib" (
 curl.exe -fsS --max-time 2 http://127.0.0.1:8000/ >nul 2>&1
 if not errorlevel 1 goto api_ready
 
-start "NIGRAANI API" "%ComSpec%" /k ""%PYTHON%" -m uvicorn backend.main:app --reload"
+rem No --reload: a reload restart kills requests mid-write. The graceful
+rem shutdown timeout lets in-flight requests finish logging their events.
+start "NIGRAANI API" "%ComSpec%" /k ""%PYTHON%" -m uvicorn backend.main:app --timeout-graceful-shutdown 10"
 set /a ATTEMPT=0
 
 :wait_for_api

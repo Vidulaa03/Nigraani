@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -7,7 +8,9 @@ from typing import Any
 from backend.detection.base import validate_event
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / "demo.db"
+# NIGRAANI_DB_PATH lets tests point at a temporary database before this module
+# runs init_db() on import.
+DB_PATH = Path(os.environ.get("NIGRAANI_DB_PATH") or BASE_DIR / "demo.db")
 
 USERS = {
     101: {
@@ -99,8 +102,16 @@ for user_offset, user_id in enumerate(USERS):
         }
 
 
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+# How long a connection waits for another connection's lock before raising
+# "database is locked" (sqlite3's own default is also 5 seconds).
+SQLITE_TIMEOUT_SECONDS = float(os.environ.get("NIGRAANI_SQLITE_TIMEOUT") or 5.0)
+
+
+def get_connection(timeout: float | None = None) -> sqlite3.Connection:
+    conn = sqlite3.connect(
+        DB_PATH,
+        timeout=SQLITE_TIMEOUT_SECONDS if timeout is None else timeout,
+    )
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -240,6 +251,7 @@ def get_events_since(
     last_event_id: int | None = None,
     limit: int | None = None,
     since_timestamp: str | None = None,
+    max_event_id: int | None = None,
 ) -> list[dict[str, Any]]:
     with get_connection() as conn:
         query = "SELECT * FROM security_events"
@@ -248,6 +260,9 @@ def get_events_since(
         if last_event_id is not None:
             conditions.append("event_id > ?")
             params.append(last_event_id)
+        if max_event_id is not None:
+            conditions.append("event_id <= ?")
+            params.append(max_event_id)
         if since_timestamp is not None:
             conditions.append("julianday(timestamp) >= julianday(?)")
             params.append(since_timestamp)
@@ -261,13 +276,71 @@ def get_events_since(
     return [dict(row) for row in rows]
 
 
-def insert_event(event: dict[str, Any]) -> int:
+def get_events_by_ids(event_ids: list[int]) -> list[dict[str, Any]]:
+    if not event_ids:
+        return []
+    with get_connection() as conn:
+        rows = []
+        # Stay well below SQLite's bound-parameter limit.
+        for start in range(0, len(event_ids), 500):
+            chunk = event_ids[start : start + 500]
+            placeholders = ",".join("?" for _ in chunk)
+            rows.extend(
+                conn.execute(
+                    f"SELECT * FROM security_events WHERE event_id IN ({placeholders})",
+                    chunk,
+                ).fetchall()
+            )
+    return sorted((dict(row) for row in rows), key=lambda row: row["event_id"])
+
+
+def get_ip_events_between(
+    ip: str,
+    start_timestamp: str,
+    end_timestamp: str,
+    max_event_id: int,
+) -> list[dict[str, Any]]:
+    """Events from one IP inside a time range, up to max_event_id."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM security_events
+            WHERE ip = ? AND event_id <= ?
+              AND julianday(timestamp) BETWEEN julianday(?) AND julianday(?)
+            ORDER BY event_id ASC
+            """,
+            (ip, max_event_id, start_timestamp, end_timestamp),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+class DuplicateEventError(ValueError):
+    """An event with this event_id is already stored; the stored one is kept."""
+
+
+def get_max_event_id(timeout: float | None = None) -> int:
+    with get_connection(timeout) as conn:
+        row = conn.execute("SELECT MAX(event_id) FROM security_events").fetchone()
+    return int(row[0]) if row[0] is not None else 0
+
+
+def insert_event(event: dict[str, Any], *, timeout: float | None = None) -> int:
     validate_event(event)
     event_id = int(event["event_id"])
-    with get_connection() as conn:
+    try:
+        _insert_event_row(event_id, event, timeout)
+    except sqlite3.IntegrityError as error:
+        if "UNIQUE" not in str(error):
+            raise
+        raise DuplicateEventError(f"event_id {event_id} already exists") from None
+    return event_id
+
+
+def _insert_event_row(event_id: int, event: dict[str, Any], timeout: float | None) -> None:
+    with get_connection(timeout) as conn:
         conn.execute(
             """
-            INSERT OR REPLACE INTO security_events (
+            INSERT INTO security_events (
                 event_id, timestamp, ip, user_id, method, endpoint, endpoint_pattern,
                 resource_id, resource_owner_id, status_code, response_time_ms, sim_label
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -288,7 +361,6 @@ def insert_event(event: dict[str, Any]) -> int:
             ),
         )
         conn.commit()
-    return event_id
 
 
 def insert_detection(detection: dict[str, Any]) -> int:
