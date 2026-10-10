@@ -22,6 +22,7 @@ import { InvestigationReportPanel } from "./InvestigationReportPanel";
 import { ActionBadge } from "../badges/ActionBadge";
 import { SeverityBadge } from "../badges/SeverityBadge";
 import { formatDateTime } from "@/lib/utils";
+import { GeminiInvestigationPanel } from "./GeminiInvestigationPanel";
 
 interface InvestigationDetailProps {
   data: InvestigationTrail;
@@ -207,6 +208,7 @@ export function InvestigationDetail({ data }: InvestigationDetailProps) {
                     </span>
                     {d.evidence}
                   </div>
+                  <GeminiInvestigationPanel detectionId={d.detection_id} />
                 </div>
               ))}
             </div>

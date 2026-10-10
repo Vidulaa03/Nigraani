@@ -8,6 +8,7 @@ import {
   CallsResponse,
   DashboardSummary,
   InAppNotification,
+  IncidentInvestigation,
   InvestigationTrail,
   MLBehaviorData,
   NotificationsResponse,
@@ -119,6 +120,17 @@ export const api = {
   getInvestigation: (eventId: number | string) =>
     fetchWithTimeout<InvestigationTrail>(
       `/api/dashboard/investigate/${encodeURIComponent(eventId)}`
+    ),
+
+  startIncidentInvestigation: (detectionId: number) =>
+    fetchWithTimeout<IncidentInvestigation>(
+      `/api/incidents/${encodeURIComponent(detectionId)}/investigate`,
+      { method: "POST" }
+    ),
+
+  getIncidentInvestigation: (investigationId: string) =>
+    fetchWithTimeout<IncidentInvestigation>(
+      `/api/incidents/investigations/${encodeURIComponent(investigationId)}`
     ),
 
   getNotifications: (params?: {

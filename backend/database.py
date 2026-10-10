@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -7,26 +8,9 @@ from typing import Any
 from backend.detection.base import validate_event
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / "demo.db"
-
-
-def _analysis_key(*parts: Any) -> str:
-    payload = json.dumps(parts, sort_keys=True, separators=(",", ":"), default=str)
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-def _canonical_event_ids(event_ids: Any) -> list[int] | None:
-    if isinstance(event_ids, str):
-        try:
-            event_ids = json.loads(event_ids)
-        except json.JSONDecodeError:
-            return None
-    if not isinstance(event_ids, list) or not event_ids:
-        return None
-    try:
-        return sorted({int(event_id) for event_id in event_ids})
-    except (TypeError, ValueError):
-        return None
+# NIGRAANI_DB_PATH lets tests point at a temporary database before this module
+# runs init_db() on import.
+DB_PATH = Path(os.environ.get("NIGRAANI_DB_PATH") or BASE_DIR / "demo.db")
 
 USERS = {
     101: {
@@ -118,10 +102,32 @@ for user_offset, user_id in enumerate(USERS):
         }
 
 
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+# How long a connection waits for another connection's lock before raising
+# "database is locked" (sqlite3's own default is also 5 seconds).
+SQLITE_TIMEOUT_SECONDS = float(os.environ.get("NIGRAANI_SQLITE_TIMEOUT") or 5.0)
+
+
+def get_connection(timeout: float | None = None) -> sqlite3.Connection:
+    conn = sqlite3.connect(
+        DB_PATH,
+        timeout=SQLITE_TIMEOUT_SECONDS if timeout is None else timeout,
+    )
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _analysis_key(*parts: Any) -> str:
+    payload = json.dumps(parts, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _canonical_event_ids(event_ids: Any) -> list[int] | None:
+    if not isinstance(event_ids, list) or not event_ids:
+        return None
+    try:
+        return sorted({int(event_id) for event_id in event_ids})
+    except (TypeError, ValueError):
+        return None
 
 
 def init_db() -> Path:
@@ -194,22 +200,34 @@ def init_db() -> Path:
             )
             """
         )
-        detection_columns = {row["name"] for row in conn.execute("PRAGMA table_info(detections)")}
+
+        detection_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(detections)")
+        }
         if "analysis_key" not in detection_columns:
             conn.execute("ALTER TABLE detections ADD COLUMN analysis_key TEXT")
 
-        decision_columns = {row["name"] for row in conn.execute("PRAGMA table_info(decisions)")}
+        decision_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(decisions)")
+        }
         if "event_ids" not in decision_columns:
             conn.execute("ALTER TABLE decisions ADD COLUMN event_ids TEXT")
         if "analysis_key" not in decision_columns:
             conn.execute("ALTER TABLE decisions ADD COLUMN analysis_key TEXT")
+
         conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_detections_analysis_key "
-            "ON detections (analysis_key) WHERE analysis_key IS NOT NULL"
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_detections_analysis_key
+            ON detections (analysis_key)
+            WHERE analysis_key IS NOT NULL
+            """
         )
         conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_decisions_analysis_key "
-            "ON decisions (analysis_key) WHERE analysis_key IS NOT NULL"
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_decisions_analysis_key
+            ON decisions (analysis_key)
+            WHERE analysis_key IS NOT NULL
+            """
         )
 
         conn.execute(
@@ -301,6 +319,7 @@ def get_events_since(
     last_event_id: int | None = None,
     limit: int | None = None,
     since_timestamp: str | None = None,
+    max_event_id: int | None = None,
 ) -> list[dict[str, Any]]:
     with get_connection() as conn:
         query = "SELECT * FROM security_events"
@@ -309,6 +328,9 @@ def get_events_since(
         if last_event_id is not None:
             conditions.append("event_id > ?")
             params.append(last_event_id)
+        if max_event_id is not None:
+            conditions.append("event_id <= ?")
+            params.append(max_event_id)
         if since_timestamp is not None:
             conditions.append("julianday(timestamp) >= julianday(?)")
             params.append(since_timestamp)
@@ -322,20 +344,71 @@ def get_events_since(
     return [dict(row) for row in rows]
 
 
-def get_latest_event_id() -> int:
-    """Return the current event cursor without loading the event history."""
+def get_events_by_ids(event_ids: list[int]) -> list[dict[str, Any]]:
+    if not event_ids:
+        return []
     with get_connection() as conn:
-        row = conn.execute("SELECT COALESCE(MAX(event_id), 0) AS event_id FROM security_events").fetchone()
-    return int(row["event_id"])
+        rows = []
+        # Stay well below SQLite's bound-parameter limit.
+        for start in range(0, len(event_ids), 500):
+            chunk = event_ids[start : start + 500]
+            placeholders = ",".join("?" for _ in chunk)
+            rows.extend(
+                conn.execute(
+                    f"SELECT * FROM security_events WHERE event_id IN ({placeholders})",
+                    chunk,
+                ).fetchall()
+            )
+    return sorted((dict(row) for row in rows), key=lambda row: row["event_id"])
 
 
-def insert_event(event: dict[str, Any]) -> int:
+def get_ip_events_between(
+    ip: str,
+    start_timestamp: str,
+    end_timestamp: str,
+    max_event_id: int,
+) -> list[dict[str, Any]]:
+    """Events from one IP inside a time range, up to max_event_id."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM security_events
+            WHERE ip = ? AND event_id <= ?
+              AND julianday(timestamp) BETWEEN julianday(?) AND julianday(?)
+            ORDER BY event_id ASC
+            """,
+            (ip, max_event_id, start_timestamp, end_timestamp),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+class DuplicateEventError(ValueError):
+    """An event with this event_id is already stored; the stored one is kept."""
+
+
+def get_max_event_id(timeout: float | None = None) -> int:
+    with get_connection(timeout) as conn:
+        row = conn.execute("SELECT MAX(event_id) FROM security_events").fetchone()
+    return int(row[0]) if row[0] is not None else 0
+
+
+def insert_event(event: dict[str, Any], *, timeout: float | None = None) -> int:
     validate_event(event)
     event_id = int(event["event_id"])
-    with get_connection() as conn:
+    try:
+        _insert_event_row(event_id, event, timeout)
+    except sqlite3.IntegrityError as error:
+        if "UNIQUE" not in str(error):
+            raise
+        raise DuplicateEventError(f"event_id {event_id} already exists") from None
+    return event_id
+
+
+def _insert_event_row(event_id: int, event: dict[str, Any], timeout: float | None) -> None:
+    with get_connection(timeout) as conn:
         conn.execute(
             """
-            INSERT OR REPLACE INTO security_events (
+            INSERT INTO security_events (
                 event_id, timestamp, ip, user_id, method, endpoint, endpoint_pattern,
                 resource_id, resource_owner_id, status_code, response_time_ms, sim_label
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -356,40 +429,69 @@ def insert_event(event: dict[str, Any]) -> int:
             ),
         )
         conn.commit()
-    return event_id
 
 
 def insert_detection(detection: dict[str, Any]) -> int:
     event_ids = detection.get("event_ids", [])
-    canonical_event_ids = _canonical_event_ids(event_ids)
-    evidence_payload = event_ids if isinstance(event_ids, str) else json.dumps(event_ids)
+    if isinstance(event_ids, str):
+        try:
+            parsed_event_ids = json.loads(event_ids)
+        except json.JSONDecodeError:
+            parsed_event_ids = event_ids
+    else:
+        parsed_event_ids = event_ids
+    evidence_payload = (
+        event_ids if isinstance(event_ids, str) else json.dumps(event_ids)
+    )
+    canonical_event_ids = _canonical_event_ids(parsed_event_ids)
     key = (
         _analysis_key(
-            detection["detector"], detection["attack_type"], detection["ip"],
-            detection.get("user_id"), canonical_event_ids,
+            detection["detector"],
+            detection["attack_type"],
+            detection["ip"],
+            detection.get("user_id"),
+            canonical_event_ids,
         )
-        if canonical_event_ids is not None else None
+        if canonical_event_ids is not None
+        else None
     )
+
     with get_connection() as conn:
         if key is not None:
             existing = conn.execute(
-                "SELECT detection_id FROM detections WHERE analysis_key = ?", (key,)
+                "SELECT detection_id FROM detections WHERE analysis_key = ?",
+                (key,),
             ).fetchone()
-            if existing:
+            if existing is not None:
                 return int(existing["detection_id"])
+
             legacy_rows = conn.execute(
-                """SELECT detection_id, event_ids FROM detections
-                   WHERE detector = ? AND ip = ? AND attack_type = ?
-                     AND user_id IS ? AND analysis_key IS NULL""",
-                (detection["detector"], detection["ip"], detection["attack_type"], detection.get("user_id")),
+                """
+                SELECT detection_id, event_ids FROM detections
+                WHERE detector = ? AND ip = ? AND attack_type = ?
+                  AND user_id IS ? AND analysis_key IS NULL
+                ORDER BY detection_id ASC
+                """,
+                (
+                    detection["detector"],
+                    detection["ip"],
+                    detection["attack_type"],
+                    detection.get("user_id"),
+                ),
             ).fetchall()
             for row in legacy_rows:
-                if _canonical_event_ids(row["event_ids"]) == canonical_event_ids:
+                try:
+                    existing_event_ids = json.loads(row["event_ids"])
+                except json.JSONDecodeError:
+                    existing_event_ids = row["event_ids"]
+                if _canonical_event_ids(existing_event_ids) == canonical_event_ids:
                     return int(row["detection_id"])
-        cursor = conn.execute(
+
+        conn.execute(
             """
-            INSERT INTO detections (
-                detector, attack_type, severity, ip, user_id, evidence, event_ids, owasp, analysis_key
+            INSERT OR IGNORE INTO detections (
+                detector, attack_type, severity, ip, user_id, evidence, event_ids,
+                owasp, analysis_key
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -405,28 +507,49 @@ def insert_detection(detection: dict[str, Any]) -> int:
             ),
         )
         conn.commit()
-    return int(cursor.lastrowid)
+        if key is None:
+            return int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+        row = conn.execute(
+            "SELECT detection_id FROM detections WHERE analysis_key = ?",
+            (key,),
+        ).fetchone()
+    if row is None:
+        raise RuntimeError("Detection insert did not create or find a record.")
+    return int(row["detection_id"])
 
 
 def insert_decision(decision: dict[str, Any]) -> int:
     reasons_payload = json.dumps(decision.get("reasons", []))
-    canonical_event_ids = _canonical_event_ids(decision.get("event_ids"))
-    event_ids_payload = json.dumps(canonical_event_ids, separators=(",", ":")) if canonical_event_ids else None
+    event_ids = decision.get("event_ids")
+    canonical_event_ids = _canonical_event_ids(event_ids)
+    event_ids_payload = (
+        json.dumps(canonical_event_ids, separators=(",", ":"))
+        if canonical_event_ids is not None
+        else None
+    )
     key = (
-        _analysis_key(decision["ip"], decision.get("source", "system"), canonical_event_ids)
-        if canonical_event_ids is not None else None
+        _analysis_key(
+            decision["ip"],
+            decision.get("source", "system"),
+            canonical_event_ids,
+        )
+        if canonical_event_ids is not None
+        else None
     )
     with get_connection() as conn:
         if key is not None:
             existing = conn.execute(
-                "SELECT decision_id FROM decisions WHERE analysis_key = ?", (key,)
+                "SELECT decision_id FROM decisions WHERE analysis_key = ?",
+                (key,),
             ).fetchone()
-            if existing:
+            if existing is not None:
                 return int(existing["decision_id"])
-        cursor = conn.execute(
+
+        conn.execute(
             """
-            INSERT INTO decisions (ip, risk_score, risk_level, action, reasons, source, event_ids, analysis_key)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR IGNORE INTO decisions (
+                ip, risk_score, risk_level, action, reasons, source, event_ids, analysis_key
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 decision["ip"],
@@ -440,7 +563,15 @@ def insert_decision(decision: dict[str, Any]) -> int:
             ),
         )
         conn.commit()
-    return int(cursor.lastrowid)
+        if key is None:
+            return int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
+        row = conn.execute(
+            "SELECT decision_id FROM decisions WHERE analysis_key = ?",
+            (key,),
+        ).fetchone()
+    if row is None:
+        raise RuntimeError("Decision insert did not create or find a record.")
+    return int(row["decision_id"])
 
 
 def get_user_by_id(user_id: int) -> dict[str, Any] | None:
@@ -453,6 +584,13 @@ def get_order_by_id(order_id: int) -> dict[str, Any] | None:
     with get_connection() as conn:
         row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
     return dict(row) if row else None
+
+
+def get_latest_event_id() -> int:
+    """Return the current event cursor without loading the event history."""
+    with get_connection() as conn:
+        row = conn.execute("SELECT COALESCE(MAX(event_id), 0) AS event_id FROM security_events").fetchone()
+    return int(row["event_id"])
 
 
 def insert_notification(notification: dict[str, Any]) -> int | None:

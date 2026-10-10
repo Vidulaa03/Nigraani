@@ -1,4 +1,11 @@
+import asyncio
+import functools
+import logging
 import time
+import weakref
+from datetime import datetime, timezone
+
+import anyio
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,9 +19,34 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.responses import Response
 
 from backend.database import ORDERS, USERS
-from backend.security_logger import log_security_event
+from backend.event_preprocessing import request_event_fields
+from backend.security_logger import (
+    SecurityEventPersistenceError,
+    SecurityEventRejected,
+    log_security_event,
+)
 from backend.dashboard_api import router as dashboard_router
-from backend.metrics import HTTP_DURATION, HTTP_REQUESTS, route_label
+from backend.gemini_api import router as gemini_router
+from backend.metrics import HTTP_DURATION, HTTP_REQUESTS, SECURITY_EVENTS, route_label
+
+logger = logging.getLogger(__name__)
+
+# Logging threads queue on one write lock anyway. A separate limiter keeps
+# a slow database from occupying the worker threads that sync routes share
+# (anyio's default limiter); requests beyond it wait without a thread.
+_LOGGING_THREADS = 4
+_logging_limiters: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, anyio.CapacityLimiter]" = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _logging_thread_limiter() -> anyio.CapacityLimiter:
+    # One per event loop: a CapacityLimiter belongs to the loop it is used on.
+    loop = asyncio.get_running_loop()
+    limiter = _logging_limiters.get(loop)
+    if limiter is None:
+        limiter = _logging_limiters[loop] = anyio.CapacityLimiter(_LOGGING_THREADS)
+    return limiter
 
 app = FastAPI(
     title="NIGRAANI",
@@ -31,6 +63,7 @@ app.add_middleware(
 )
 
 app.include_router(dashboard_router, prefix="/api/dashboard")
+app.include_router(gemini_router)
 
 
 @app.middleware("http")
@@ -58,52 +91,87 @@ def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-@app.middleware("http")
-async def security_logging_middleware(request: Request, call_next):
-    start_time = time.perf_counter()
-    response = await call_next(request)
-    response_time_ms = (time.perf_counter() - start_time) * 1000
-
-    forwarded_ip = request.headers.get("X-Forwarded-For")
-    if forwarded_ip:
-        ip = forwarded_ip.split(",")[0].strip()
-    else:
-        ip = request.client.host if request.client else "unknown"
-
-    user_id = request.headers.get("X-User-ID")
-    if user_id is not None:
-        try:
-            user_id = int(user_id)
-        except ValueError:
-            user_id = None
-
-    resource_id = None
-    resource_owner_id = None
-    endpoint = request.url.path
-    if endpoint.startswith("/api/dashboard") or endpoint.startswith("/metrics") or endpoint in {"/docs", "/openapi.json", "/favicon.ico"}:
-        return response
-
-    if endpoint.startswith("/api/orders/"):
-        try:
-            resource_id = int(endpoint.rsplit("/", 1)[-1])
-        except ValueError:
-            resource_id = None
-
-        if resource_id in ORDERS:
-            resource_owner_id = ORDERS[resource_id].get("owner_id")
-
-    log_security_event(
-        ip=ip,
-        method=request.method,
-        endpoint=endpoint,
-        status_code=response.status_code,
-        response_time_ms=response_time_ms,
-        user_id=user_id,
-        resource_id=resource_id,
-        resource_owner_id=resource_owner_id,
-        sim_label=request.headers.get("X-Sim-Label", "normal"),
+def _skip_security_logging(request: Request) -> bool:
+    path = request.url.path
+    if (
+        path.startswith("/api/dashboard")
+        or path.startswith("/metrics")
+        or path in {"/docs", "/openapi.json", "/favicon.ico"}
+    ):
+        return True
+    # CORS preflight: the browser asking permission, not an API call.
+    return (
+        request.method == "OPTIONS"
+        and "origin" in request.headers
+        and "access-control-request-method" in request.headers
     )
 
+
+async def _record_security_event(
+    request: Request,
+    *,
+    status_code: int,
+    started_at: datetime,
+    response_time_ms: float,
+) -> None:
+    """Log the request. Never raises: a logging problem must not change the
+    response or replace the route's own exception."""
+    try:
+        fields = request_event_fields(
+            method=request.method,
+            path=request.url.path,
+            headers=request.headers,
+            client_host=request.client.host if request.client else None,
+        )
+        # SQLite and file I/O run in a worker thread, off the event loop.
+        # Cancellation waits for a started write instead of abandoning it.
+        await anyio.to_thread.run_sync(
+            functools.partial(
+                log_security_event,
+                **fields,
+                status_code=status_code,
+                response_time_ms=response_time_ms,
+                timestamp=started_at,
+            ),
+            limiter=_logging_thread_limiter(),
+        )
+    except (SecurityEventRejected, SecurityEventPersistenceError):
+        pass  # Already logged and counted by backend.security_logger.
+    except Exception:
+        SECURITY_EVENTS.labels("failed").inc()
+        logger.exception("Security event logging failed")
+    except BaseException:
+        # Cancellation (e.g. shutdown) before the write started: the event is
+        # lost, so make that visible before letting cancellation proceed.
+        SECURITY_EVENTS.labels("failed").inc()
+        logger.warning("Security event logging cancelled; event for %s not stored", request.method)
+        raise
+
+
+@app.middleware("http")
+async def security_logging_middleware(request: Request, call_next):
+    if _skip_security_logging(request):
+        return await call_next(request)
+
+    started_at = datetime.now(timezone.utc)
+    start_time = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        await _record_security_event(
+            request,
+            status_code=500,
+            started_at=started_at,
+            response_time_ms=(time.perf_counter() - start_time) * 1000,
+        )
+        raise
+
+    await _record_security_event(
+        request,
+        status_code=response.status_code,
+        started_at=started_at,
+        response_time_ms=(time.perf_counter() - start_time) * 1000,
+    )
     return response
 
 

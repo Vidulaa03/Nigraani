@@ -57,6 +57,7 @@ OWASP_MAP = {
     "login_failure_detector": _LOGIN_FAILURE_MAPPING,
     "rate_spike": _RATE_SPIKE_MAPPING,
     "rate_detector": _RATE_SPIKE_MAPPING,
+    "multi_rate_detector": _RATE_SPIKE_MAPPING,
     "ml_score": _ML_MAPPING,
 }
 
