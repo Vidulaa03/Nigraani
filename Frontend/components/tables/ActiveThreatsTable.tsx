@@ -33,10 +33,10 @@ export function ActiveThreatsTable({
   const items = limit ? detections.slice(0, limit) : detections;
 
   return (
-    <div className="bg-[#ffffff] border border-[#e5e0d5] rounded-none overflow-hidden">
+    <div className="bg-[#FFFFFF] border border-[#D5EAE5] rounded-sm overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs font-sans">
-          <thead className="bg-[#ffffff] border-b border-[#e5e0d5] text-[#716c60] uppercase tracking-wider text-[11px]">
+          <thead className="bg-[#F2FBF9] border-b border-[#D5EAE5] text-[#486966] uppercase tracking-wider text-[11px] font-semibold">
             <tr>
               <th className="py-3 px-4">Severity</th>
               <th className="py-3 px-4">Attack Type</th>
@@ -49,7 +49,7 @@ export function ActiveThreatsTable({
               <th className="py-3 px-4 text-right">Investigate</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#eeeae1] text-[#464238]">
+          <tbody className="divide-y divide-[#D5EAE5] text-[#02353C]">
             {items.map((d) => {
               const firstEventId =
                 d.event_ids && d.event_ids.length > 0
@@ -59,28 +59,28 @@ export function ActiveThreatsTable({
               return (
                 <tr
                   key={d.detection_id}
-                  className="hover:bg-[#f4f1e8] transition-colors"
+                  className="hover:bg-[#F2FBF9] transition-colors"
                 >
                   <td className="py-3 px-4 whitespace-nowrap">
                     <SeverityBadge band={d.severity_band} score={d.severity} />
                   </td>
-                  <td className="py-3 px-4 whitespace-nowrap font-medium text-[#27251f]">
+                  <td className="py-3 px-4 whitespace-nowrap font-medium text-[#02353C]">
                     {d.attack_type}
-                    <div className="text-[10px] text-[#716c60]">{d.owasp}</div>
+                    <div className="text-[10px] text-[#486966]">{d.owasp}</div>
                   </td>
-                  <td className="py-3 px-4 whitespace-nowrap text-amber-800">
+                  <td className="py-3 px-4 whitespace-nowrap font-mono text-[#02353C] font-semibold">
                     {d.ip}
                   </td>
-                  <td className="py-3 px-4 whitespace-nowrap max-w-[200px] truncate text-[#716c60]">
+                  <td className="py-3 px-4 whitespace-nowrap max-w-[200px] truncate text-[#486966]">
                     {d.linked_endpoint || "—"}
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">
                     {d.ml_score !== null && d.ml_score !== undefined ? (
-                      <span className="font-semibold text-purple-800">
+                      <span className="font-semibold text-[#02353C]">
                         {d.ml_score.toFixed(1)}
                       </span>
                     ) : (
-                      <span className="text-[#716c60]">N/A</span>
+                      <span className="text-[#486966]">N/A</span>
                     )}
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap font-semibold">
@@ -88,41 +88,41 @@ export function ActiveThreatsTable({
                       <span
                         className={
                           d.risk_score >= 80
-                            ? "text-red-700"
+                            ? "text-[#DC2626] font-bold"
                             : d.risk_score >= 60
-                            ? "text-orange-700"
+                            ? "text-[#EA580C] font-bold"
                             : d.risk_score >= 30
-                            ? "text-amber-800"
-                            : "text-emerald-700"
+                            ? "text-[#D97706]"
+                            : "text-[#2EAF7D]"
                         }
                       >
                         {d.risk_score}
                       </span>
                     ) : (
-                      <span className="text-[#716c60]">N/A</span>
+                      <span className="text-[#486966]">N/A</span>
                     )}
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">
                     {d.action ? (
                       <ActionBadge action={d.action} size="sm" />
                     ) : (
-                      <span className="text-[#716c60]">—</span>
+                      <span className="text-[#486966]">—</span>
                     )}
                   </td>
-                  <td className="py-3 px-4 whitespace-nowrap text-[#716c60] text-[11px]">
+                  <td className="py-3 px-4 whitespace-nowrap text-[#486966] text-[11px]">
                     {formatDateTime(d.linked_timestamp)}
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap text-right">
                     {firstEventId ? (
                       <Link
                         href={`/investigate/${firstEventId}`}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-none bg-[#ffffff] hover:bg-amber-500/20 text-amber-900 border border-[#e5e0d5] hover:border-amber-500/40 text-[11px] transition-colors"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-sm bg-[#FFFFFF] hover:bg-[#F2FBF9] text-[#02353C] border border-[#D5EAE5] hover:border-[#2EAF7D] text-[11px] font-medium transition-colors"
                       >
                         <span>Inspect</span>
-                        <ExternalLink className="w-3 h-3" />
+                        <ExternalLink className="w-3 h-3 text-[#2EAF7D]" />
                       </Link>
                     ) : (
-                      <span className="text-[#716c60] text-[11px]">—</span>
+                      <span className="text-[#486966] text-[11px]">—</span>
                     )}
                   </td>
                 </tr>
@@ -133,10 +133,10 @@ export function ActiveThreatsTable({
       </div>
 
       {showAllLink && detections.length > (limit || 10) && (
-        <div className="p-3 bg-[#ffffff] border-t border-[#e5e0d5] text-center">
+        <div className="p-3 bg-[#F2FBF9] border-t border-[#D5EAE5] text-center">
           <Link
             href="/threats"
-            className="text-xs font-sans text-amber-800 hover:text-amber-900 font-semibold"
+            className="text-xs font-sans text-[#2EAF7D] hover:text-[#02353C] font-semibold"
           >
             View all {detections.length} detections &rarr;
           </Link>

@@ -15,22 +15,22 @@ export function ThreatPostureCard({ posture, className }: ThreatPostureCardProps
     return (
       <div
         className={cn(
-          "relative bg-[#ffffff] border border-[#e5e0d5] rounded-none p-5 flex flex-col justify-between",
+          "relative bg-white border border-[#D5EAE5] rounded-[4px] p-5 flex flex-col justify-between shadow-sm",
           className
         )}
       >
         <div className="flex items-center justify-between mb-4">
-          <span className="text-xs font-sans uppercase tracking-wider text-[#716c60]">
+          <span className="text-xs font-sans uppercase tracking-wider text-[#486966]">
             Current Threat Posture
           </span>
-          <Shield className="w-5 h-5 text-amber-800 opacity-60" />
+          <Shield className="w-5 h-5 text-[#2EAF7D] opacity-60" />
         </div>
         <div className="py-6 text-center">
-          <div className="font-sans text-lg font-bold text-amber-800">
-            NO RISK DECISION
+          <div className="font-sans text-base font-bold text-[#02353C]">
+            NO ACTIVE ABUSE THREAT
           </div>
-          <p className="text-xs text-[#716c60] mt-1 font-sans">
-            WAITING FOR ANALYZER OUTPUT
+          <p className="text-xs text-[#486966] mt-1 font-sans">
+            Baseline traffic monitoring active
           </p>
         </div>
       </div>
@@ -39,44 +39,43 @@ export function ThreatPostureCard({ posture, className }: ThreatPostureCardProps
 
   const { risk_score, risk_level, action, ip, reasons } = posture;
 
-  // Determine accent style based on risk score
   const isCritical = risk_score >= 80;
   const isHigh = risk_score >= 60 && risk_score < 80;
   const isMedium = risk_score >= 30 && risk_score < 60;
 
   const borderColor = isCritical
-    ? "border-red-500/40 shadow-[0_0_24px_rgba(239,68,68,0.12)]"
+    ? "border-red-300"
     : isHigh
-    ? "border-orange-500/40 shadow-[0_0_24px_rgba(249,115,22,0.12)]"
+    ? "border-amber-300"
     : isMedium
-    ? "border-amber-500/30"
-    : "border-emerald-500/30";
+    ? "border-[#D5EAE5]"
+    : "border-[#D5EAE5]";
 
   const scoreColor = isCritical
     ? "text-red-700"
     : isHigh
-    ? "text-orange-700"
+    ? "text-amber-700"
     : isMedium
-    ? "text-amber-800"
-    : "text-emerald-700";
+    ? "text-[#02353C]"
+    : "text-[#2EAF7D]";
 
   return (
     <div
       className={cn(
-        "relative bg-[#ffffff] border rounded-none p-5 flex flex-col justify-between transition-all",
+        "relative bg-white border rounded-[4px] p-5 flex flex-col justify-between transition-all shadow-sm",
         borderColor,
         className
       )}
     >
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-sans uppercase tracking-wider text-[#716c60]">
+          <span className="text-xs font-sans uppercase tracking-wider text-[#486966]">
             Current Threat Posture
           </span>
           {isCritical || isHigh ? (
-            <ShieldAlert className="w-5 h-5 text-red-700" />
+            <ShieldAlert className="w-5 h-5 text-red-600" />
           ) : (
-            <ShieldCheck className="w-5 h-5 text-emerald-700" />
+            <ShieldCheck className="w-5 h-5 text-[#2EAF7D]" />
           )}
         </div>
 
@@ -84,7 +83,7 @@ export function ThreatPostureCard({ posture, className }: ThreatPostureCardProps
           <span className={cn("text-4xl font-sans font-extrabold tracking-tight", scoreColor)}>
             {risk_score}
           </span>
-          <span className="text-sm font-sans text-[#716c60]">/ 100</span>
+          <span className="text-sm font-sans text-[#486966]">/ 100</span>
         </div>
 
         <div className="flex items-center gap-2 mt-3">
@@ -93,11 +92,12 @@ export function ThreatPostureCard({ posture, className }: ThreatPostureCardProps
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-[#e5e0d5] text-xs">
-        <div className="flex justify-between items-center text-[#716c60] font-sans text-[11px] mb-1">
+      <div className="mt-4 pt-3 border-t border-[#D5EAE5] text-xs">
+        <div className="flex justify-between items-center text-[#486966] font-sans text-[11px] mb-1">
           <span>Target IP:</span>
-          <span className="text-[#464238]">{ip}</span>
+          <span className="text-[#02353C] font-mono font-medium">{ip}</span>
         </div>
+
         {reasons && reasons.length > 0 && (
           <div className="text-[11px] text-[#716c60] truncate font-sans" title={reasons.join("; ")}>
             {reasons[0]}

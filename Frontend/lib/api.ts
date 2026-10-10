@@ -4,13 +4,18 @@
  */
 
 import {
+  CallAlert,
+  CallsResponse,
   DashboardSummary,
+  InAppNotification,
   InvestigationTrail,
   MLBehaviorData,
+  NotificationsResponse,
   SecurityEventsResponse,
   SystemHealth,
   ThreatIntelligenceData,
   TrafficData,
+  VoiceConfigStatus,
 } from "./types";
 
 const API_BASE_URL =
@@ -115,4 +120,64 @@ export const api = {
     fetchWithTimeout<InvestigationTrail>(
       `/api/dashboard/investigate/${encodeURIComponent(eventId)}`
     ),
+
+  getNotifications: (params?: {
+    limit?: number;
+    offset?: number;
+    unreadOnly?: boolean;
+    severityBand?: string;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.offset) q.set("offset", String(params.offset));
+    if (params?.unreadOnly) q.set("unread_only", "true");
+    if (params?.severityBand) q.set("severity_band", params.severityBand);
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    return fetchWithTimeout<NotificationsResponse>(
+      `/api/dashboard/notifications${qs}`
+    );
+  },
+
+  getUnreadCount: () =>
+    fetchWithTimeout<{ unread_count: number }>(
+      "/api/dashboard/notifications/unread-count"
+    ),
+
+  markNotificationRead: (notificationId: number) =>
+    fetchWithTimeout<{ success: boolean; notification_id: number; unread_count: number }>(
+      `/api/dashboard/notifications/${notificationId}/read`,
+      { method: "POST" }
+    ),
+
+  markAllNotificationsRead: () =>
+    fetchWithTimeout<{ success: boolean; updated_count: number; unread_count: number }>(
+      "/api/dashboard/notifications/read-all",
+      { method: "POST" }
+    ),
+
+  getVoiceConfig: () =>
+    fetchWithTimeout<VoiceConfigStatus>("/api/dashboard/calls/config"),
+
+  getCalls: (params?: {
+    limit?: number;
+    offset?: number;
+    incidentId?: string;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.offset) q.set("offset", String(params.offset));
+    if (params?.incidentId) q.set("incident_id", params.incidentId);
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    return fetchWithTimeout<CallsResponse>(`/api/dashboard/calls${qs}`);
+  },
+
+  getCallDetails: (callIdOrSid: string | number) =>
+    fetchWithTimeout<CallAlert>(`/api/dashboard/calls/${callIdOrSid}`),
+
+  triggerTestCall: () =>
+    fetchWithTimeout<{ success: boolean; status: string; call_sid?: string; reason?: string }>(
+      "/api/dashboard/calls/test",
+      { method: "POST" }
+    ),
 };
+

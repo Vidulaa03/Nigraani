@@ -78,47 +78,47 @@ export function TrafficTimelineChart({
         >
           <defs>
             <linearGradient id="reqGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#bd7b12" stopOpacity={0.4} />
-              <stop offset="95%" stopColor="#bd7b12" stopOpacity={0.0} />
+              <stop offset="5%" stopColor="#2EAF7D" stopOpacity={0.35} />
+              <stop offset="95%" stopColor="#2EAF7D" stopOpacity={0.0} />
             </linearGradient>
             <linearGradient id="errGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#ef4444" stopOpacity={0.5} />
-              <stop offset="95%" stopColor="#ef4444" stopOpacity={0.0} />
+              <stop offset="5%" stopColor="#DC2626" stopOpacity={0.4} />
+              <stop offset="95%" stopColor="#DC2626" stopOpacity={0.0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#716c60" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#D5EAE5" vertical={false} />
           <XAxis
             dataKey="time"
-            stroke="#716c60"
+            stroke="#486966"
             fontSize={10}
             tickLine={false}
-            axisLine={{ stroke: "#716c60" }}
+            axisLine={{ stroke: "#D5EAE5" }}
           />
           <YAxis
-            stroke="#716c60"
+            stroke="#486966"
             fontSize={10}
             tickLine={false}
-            axisLine={{ stroke: "#716c60" }}
+            axisLine={{ stroke: "#D5EAE5" }}
             allowDecimals={false}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#ffffff",
-              borderColor: "#ded7ca",
-              borderRadius: "0",
+              backgroundColor: "#FFFFFF",
+              borderColor: "#D5EAE5",
+              borderRadius: "2px",
               fontSize: "12px",
               fontFamily: "monospace",
-              color: "#27251f",
-              boxShadow: "0 6px 18px rgba(39, 37, 31, 0.12)",
+              color: "#02353C",
+              boxShadow: "0 4px 12px rgba(2, 53, 60, 0.08)",
             }}
-            labelStyle={{ color: "#716c60", marginBottom: "4px" }}
-            itemStyle={{ color: "#27251f" }}
+            labelStyle={{ color: "#486966", marginBottom: "4px" }}
+            itemStyle={{ color: "#02353C" }}
           />
           <Area
             type="monotone"
             dataKey="requests"
             name="Requests"
-            stroke="#bd7b12"
+            stroke="#2EAF7D"
             strokeWidth={2}
             fillOpacity={1}
             fill="url(#reqGradient)"
@@ -127,7 +127,7 @@ export function TrafficTimelineChart({
             type="monotone"
             dataKey="errors"
             name="Errors (4xx/5xx)"
-            stroke="#ef4444"
+            stroke="#DC2626"
             strokeWidth={1.5}
             fillOpacity={1}
             fill="url(#errGradient)"
@@ -135,5 +135,6 @@ export function TrafficTimelineChart({
         </AreaChart>
       </ResponsiveContainer>
     </div>
+
   );
 }

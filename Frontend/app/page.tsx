@@ -125,22 +125,22 @@ export default function CommandCenterPage() {
 
         {/* Row 2: Live Traffic Timeline & Threat Posture Card */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-[#ffffff] border border-[#e5e0d5] rounded-none p-5 flex flex-col justify-between">
+          <div className="lg:col-span-2 bg-[#FFFFFF] border border-[#D5EAE5] rounded-sm p-5 flex flex-col justify-between">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#27251f]">
+                <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#02353C]">
                   Live API Traffic Timeline
                 </h3>
-                <p className="text-[11px] text-[#716c60] font-sans mt-0.5">
+                <p className="text-[11px] text-[#486966] font-sans mt-0.5">
                   Request volume & error spikes across 30-second epoch intervals
                 </p>
               </div>
-              <div className="flex items-center gap-2 text-[11px] font-sans text-[#716c60]">
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-none bg-[#ffffff]" /> Requests
+              <div className="flex items-center gap-3 text-[11px] font-sans text-[#486966]">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-[#2EAF7D]" /> Requests
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-none bg-[#ffffff]" /> Errors
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-[#DC2626]" /> Errors
                 </span>
               </div>
             </div>
@@ -159,16 +159,16 @@ export default function CommandCenterPage() {
         {/* Row 3: ML Anomaly Timeline, Severity Mix, Decision Distribution */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* ML Anomaly Timeline */}
-          <div className="bg-[#ffffff] border border-[#e5e0d5] rounded-none p-5">
+          <div className="bg-[#FFFFFF] border border-[#D5EAE5] rounded-sm p-5">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#27251f]">
+              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#02353C]">
                 ML Anomaly Trajectory
               </h3>
-              <span className="text-[10px] font-sans px-2 py-0.5 rounded-none bg-purple-500/10 text-purple-800 border border-purple-500/30">
+              <span className="text-[10px] font-sans px-2 py-0.5 rounded-sm bg-[#3FD0C9]/15 text-[#02353C] border border-[#3FD0C9]/40 font-semibold">
                 Isolation Forest
               </span>
             </div>
-            <p className="text-[11px] text-[#716c60] font-sans mb-3">
+            <p className="text-[11px] text-[#486966] font-sans mb-3">
               Per-window ML scores with 50.0 threshold marker
             </p>
             <MLAnomalyTimelineChart
@@ -178,16 +178,16 @@ export default function CommandCenterPage() {
           </div>
 
           {/* Severity Distribution */}
-          <div className="bg-[#ffffff] border border-[#e5e0d5] rounded-none p-5">
+          <div className="bg-[#FFFFFF] border border-[#D5EAE5] rounded-sm p-5">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#27251f]">
+              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#02353C]">
                 Detection Severity Mix
               </h3>
-              <span className="text-[10px] font-sans px-2 py-0.5 rounded-none bg-orange-500/10 text-orange-700 border border-orange-500/30">
+              <span className="text-[10px] font-sans px-2 py-0.5 rounded-sm bg-[#2EAF7D]/15 text-[#02353C] border border-[#2EAF7D]/40 font-semibold">
                 Rule Engine
               </span>
             </div>
-            <p className="text-[11px] text-[#716c60] font-sans mb-3">
+            <p className="text-[11px] text-[#486966] font-sans mb-3">
               Categorization by detection severity cutoff
             </p>
             <SeverityBreakdownChart
@@ -204,16 +204,16 @@ export default function CommandCenterPage() {
           </div>
 
           {/* Decision Distribution */}
-          <div className="bg-[#ffffff] border border-[#e5e0d5] rounded-none p-5">
+          <div className="bg-[#FFFFFF] border border-[#D5EAE5] rounded-sm p-5">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#27251f]">
+              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#02353C]">
                 Enforcement Actions
               </h3>
-              <span className="text-[10px] font-sans px-2 py-0.5 rounded-none bg-emerald-500/10 text-emerald-700 border border-emerald-500/30">
+              <span className="text-[10px] font-sans px-2 py-0.5 rounded-sm bg-[#2EAF7D]/15 text-[#02353C] border border-[#2EAF7D]/40 font-semibold">
                 Risk Engine
               </span>
             </div>
-            <p className="text-[11px] text-[#716c60] font-sans mb-3">
+            <p className="text-[11px] text-[#486966] font-sans mb-3">
               Persisted decisions: ALLOW, MONITOR, THROTTLE, BLOCK
             </p>
             <DecisionDistributionChart
@@ -234,14 +234,14 @@ export default function CommandCenterPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#27251f]">
+              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#02353C]">
                 Active Security Threat Feed
               </h3>
-              <p className="text-[11px] text-[#716c60] font-sans">
+              <p className="text-[11px] text-[#486966] font-sans">
                 Persisted detections correlated with ML scores and risk decisions
               </p>
             </div>
-            <span className="text-xs font-sans text-[#716c60]">
+            <span className="text-xs font-sans text-[#486966]">
               Showing {summary?.recent_detections?.length || 0} latest detections
             </span>
           </div>

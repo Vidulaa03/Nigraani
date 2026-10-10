@@ -43,32 +43,32 @@ export function getSeverityStyle(band: string | null | undefined) {
   switch (b) {
     case "CRITICAL":
       return {
-        bg: "bg-red-500/10",
-        text: "text-red-400",
-        border: "border-red-500/30",
-        dot: "bg-red-500",
+        bg: "bg-red-50",
+        text: "text-red-700",
+        border: "border-red-200",
+        dot: "bg-red-600",
       };
     case "HIGH":
       return {
-        bg: "bg-orange-500/10",
-        text: "text-orange-400",
-        border: "border-orange-500/30",
-        dot: "bg-orange-500",
+        bg: "bg-amber-50",
+        text: "text-amber-800",
+        border: "border-amber-200",
+        dot: "bg-amber-600",
       };
     case "MEDIUM":
       return {
-        bg: "bg-amber-500/10",
-        text: "text-amber-300",
-        border: "border-amber-500/30",
-        dot: "bg-amber-400",
+        bg: "bg-[#EAF8F5]",
+        text: "text-[#02353C]",
+        border: "border-[#D5EAE5]",
+        dot: "bg-[#3FD0C9]",
       };
     case "LOW":
     default:
       return {
-        bg: "bg-emerald-500/10",
-        text: "text-emerald-400",
-        border: "border-emerald-500/30",
-        dot: "bg-emerald-400",
+        bg: "bg-[#F2FBF9]",
+        text: "text-[#486966]",
+        border: "border-[#D5EAE5]",
+        dot: "bg-[#2EAF7D]",
       };
   }
 }
@@ -78,32 +78,33 @@ export function getActionStyle(action: string | null | undefined) {
   switch (a) {
     case "BLOCK":
       return {
-        bg: "bg-red-950/40",
-        text: "text-red-400 font-bold",
-        border: "border-red-600/40",
-        glow: "shadow-[0_0_12px_rgba(239,68,68,0.25)]",
+        bg: "bg-red-50",
+        text: "text-red-700 font-bold",
+        border: "border-red-200",
+        glow: "",
       };
     case "THROTTLE":
       return {
-        bg: "bg-orange-950/40",
-        text: "text-orange-400 font-semibold",
-        border: "border-orange-500/40",
-        glow: "shadow-[0_0_12px_rgba(249,115,22,0.2)]",
+        bg: "bg-amber-50",
+        text: "text-amber-800 font-semibold",
+        border: "border-amber-200",
+        glow: "",
       };
     case "MONITOR":
       return {
-        bg: "bg-amber-950/40",
-        text: "text-amber-300 font-medium",
-        border: "border-amber-500/40",
-        glow: "shadow-[0_0_12px_rgba(245,158,11,0.2)]",
+        bg: "bg-[#EAF8F5]",
+        text: "text-[#02353C] font-medium",
+        border: "border-[#D5EAE5]",
+        glow: "",
       };
     case "ALLOW":
     default:
       return {
-        bg: "bg-emerald-950/30",
-        text: "text-emerald-400 font-medium",
-        border: "border-emerald-500/30",
-        glow: "shadow-[0_0_12px_rgba(34,197,94,0.15)]",
+        bg: "bg-emerald-50",
+        text: "text-emerald-800 font-medium",
+        border: "border-emerald-200",
+        glow: "",
       };
   }
 }
+

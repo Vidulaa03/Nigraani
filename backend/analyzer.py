@@ -10,6 +10,12 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, BinaryIO
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from backend.database import DB_PATH, get_events_since, insert_decision, insert_detection
 from backend.detection import (
     bola_detector,
@@ -18,6 +24,8 @@ from backend.detection import (
     rate_detector,
 )
 from backend.detection.risk_engine import compute_risk
+from backend.notification_service import evaluate_and_notify_incident
+from backend.twilio_service import initiate_voice_alert
 from backend.metrics import (
     ANALYSIS_DURATION,
     ANALYSIS_FAILURES,
@@ -75,8 +83,12 @@ def _acquire_single_instance_lock() -> BinaryIO:
         if os.name == "nt":
             import msvcrt
 
-            lock_file.seek(0)
-            if not lock_file.read(1):
+            # Avoid reading the lock file here. On Windows, read access can be
+            # denied when another process has the file open, even though the
+            # byte-range lock below is the operation that should decide
+            # whether this analyzer instance may run.
+            lock_file.seek(0, os.SEEK_END)
+            if lock_file.tell() == 0:
                 lock_file.write(b"\0")
                 lock_file.flush()
             lock_file.seek(0)
@@ -88,7 +100,7 @@ def _acquire_single_instance_lock() -> BinaryIO:
     except OSError as error:
         lock_file.close()
         raise RuntimeError(
-            "Another analyzer is already running for this database."
+            f"Could not acquire analyzer lock at {lock_path}: {error}"
         ) from error
     return lock_file
 
@@ -182,7 +194,8 @@ def process_new_events(last_event_id: int | None = None) -> int:
                             detector, _severity_band(int(detection["severity"]))
                         ).inc()
 
-                insert_decision(
+                decision["ip"] = ip
+                decision_id = insert_decision(
                     {
                         "ip": ip,
                         "risk_score": decision["risk_score"],
@@ -194,6 +207,26 @@ def process_new_events(last_event_id: int | None = None) -> int:
                 )
                 RISK_DECISIONS.labels(str(decision["action"])).inc()
                 RISK_SCORE.observe(float(decision["risk_score"]))
+
+                # Integrated notification & voice calling workflow
+                incident_id = f"decision-{decision_id}"
+                endpoint = next((e.get("endpoint") for e in reversed(window_events) if e.get("endpoint")), None)
+                notif = None
+                try:
+                    notif = evaluate_and_notify_incident(decision, detections, incident_id=incident_id)
+                except Exception as notif_err:
+                    print(f"WARNING: Notification creation failed: {notif_err}", file=sys.stderr)
+
+                try:
+                    initiate_voice_alert(
+                        incident_id=incident_id,
+                        decision=decision,
+                        detections=detections,
+                        notification_id=notif.get("notification_id") if notif else None,
+                        endpoint=endpoint,
+                    )
+                except Exception as call_err:
+                    print(f"WARNING: Voice alert failed: {call_err}", file=sys.stderr)
 
             ANALYSIS_RUNS.inc()
         except Exception:

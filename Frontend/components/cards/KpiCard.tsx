@@ -7,7 +7,7 @@ interface KpiCardProps {
   value: string | number | null | undefined;
   subtext?: string;
   icon: LucideIcon;
-  color?: "cyan" | "purple" | "red" | "orange" | "green" | "amber";
+  color?: "cyan" | "purple" | "red" | "orange" | "green" | "amber" | "emerald";
   className?: string;
 }
 
@@ -21,36 +21,37 @@ export function KpiCard({
 }: KpiCardProps) {
   const colorMap = {
     cyan: {
-      border: "border-amber-500/20 hover:border-amber-500/40",
-      iconBg: "bg-amber-500/10 text-amber-800 border-amber-500/20",
-      glow: "hover:shadow-[0_0_20px_rgba(56,189,248,0.06)]",
+      border: "border-[#D5EAE5] hover:border-[#2EAF7D]",
+      iconBg: "bg-[#EAF8F5] text-[#2EAF7D] border-[#D5EAE5]",
     },
     purple: {
-      border: "border-purple-500/20 hover:border-purple-500/40",
-      iconBg: "bg-purple-500/10 text-purple-800 border-purple-500/20",
-      glow: "hover:shadow-[0_0_20px_rgba(168,85,247,0.06)]",
+      border: "border-[#D5EAE5] hover:border-[#3FD0C9]",
+      iconBg: "bg-[#F2FBF9] text-[#02353C] border-[#D5EAE5]",
     },
     red: {
-      border: "border-red-500/20 hover:border-red-500/40",
-      iconBg: "bg-red-500/10 text-red-700 border-red-500/20",
-      glow: "hover:shadow-[0_0_20px_rgba(239,68,68,0.06)]",
+      border: "border-red-200 hover:border-red-400",
+      iconBg: "bg-red-50 text-red-700 border-red-200",
     },
     orange: {
-      border: "border-orange-500/20 hover:border-orange-500/40",
-      iconBg: "bg-orange-500/10 text-orange-700 border-orange-500/20",
-      glow: "hover:shadow-[0_0_20px_rgba(249,115,22,0.06)]",
+      border: "border-amber-200 hover:border-amber-400",
+      iconBg: "bg-amber-50 text-amber-800 border-amber-200",
     },
     amber: {
-      border: "border-amber-500/20 hover:border-amber-500/40",
-      iconBg: "bg-amber-500/10 text-amber-800 border-amber-500/20",
-      glow: "hover:shadow-[0_0_20px_rgba(245,158,11,0.06)]",
+      border: "border-amber-200 hover:border-amber-400",
+      iconBg: "bg-amber-50 text-amber-800 border-amber-200",
     },
     green: {
-      border: "border-emerald-500/20 hover:border-emerald-500/40",
-      iconBg: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
-      glow: "hover:shadow-[0_0_20px_rgba(34,197,94,0.06)]",
+      border: "border-[#D5EAE5] hover:border-[#2EAF7D]",
+      iconBg: "bg-emerald-50 text-[#2EAF7D] border-emerald-200",
     },
-  }[color];
+    emerald: {
+      border: "border-[#D5EAE5] hover:border-[#2EAF7D]",
+      iconBg: "bg-emerald-50 text-[#2EAF7D] border-emerald-200",
+    },
+  }[color as string] || {
+    border: "border-[#D5EAE5] hover:border-[#2EAF7D]",
+    iconBg: "bg-[#EAF8F5] text-[#2EAF7D] border-[#D5EAE5]",
+  };
 
   const displayValue =
     value === null || value === undefined
@@ -62,19 +63,18 @@ export function KpiCard({
   return (
     <div
       className={cn(
-        "relative bg-[#ffffff] border rounded-none p-4 transition-all duration-200",
+        "relative bg-white border rounded-[4px] p-4 transition-all duration-200 shadow-sm",
         colorMap.border,
-        colorMap.glow,
         className
       )}
     >
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-sans uppercase tracking-wider text-[#716c60]">
+        <span className="text-[11px] font-sans uppercase tracking-wider text-[#486966]">
           {title}
         </span>
         <div
           className={cn(
-            "w-8 h-8 rounded-none flex items-center justify-center border",
+            "w-8 h-8 rounded-[2px] flex items-center justify-center border",
             colorMap.iconBg
           )}
         >
@@ -82,13 +82,14 @@ export function KpiCard({
         </div>
       </div>
 
-      <div className="font-sans text-2xl font-bold tracking-tight text-[#27251f] my-1">
+      <div className="font-sans text-2xl font-bold tracking-tight text-[#02353C] my-1">
         {displayValue}
       </div>
 
       {subtext && (
-        <div className="text-xs text-[#716c60] truncate mt-1">{subtext}</div>
+        <div className="text-xs text-[#486966] truncate mt-1">{subtext}</div>
       )}
     </div>
   );
 }
+

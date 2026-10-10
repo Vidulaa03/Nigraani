@@ -249,4 +249,70 @@ export interface InvestigationTrail {
     total_decisions_for_ip: number;
   } | null;
   lifecycle: InvestigationLifecycleStage[];
+  calls?: CallAlert[];
+}
+
+export interface InAppNotification {
+  notification_id: number;
+  incident_id: string;
+  title: string;
+  message: string;
+  severity: number;
+  severity_band: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+  created_at: string;
+  is_read: boolean;
+  recipient: string;
+  idempotency_key: string;
+  metadata?: {
+    ip?: string;
+    action?: string;
+    risk_score?: number;
+    risk_level?: string;
+    reasons?: string[];
+    attack_types?: string[];
+    detector_count?: number;
+  };
+}
+
+export interface NotificationsResponse {
+  notifications: InAppNotification[];
+  total: number;
+  unread_count: number;
+  limit: number;
+  offset: number;
+}
+
+export interface CallAlert {
+  call_id: number;
+  call_sid: string;
+  incident_id: string;
+  notification_id?: number | null;
+  to_number: string;
+  from_number: string;
+  trigger_reason: string;
+  status: "queued" | "initiated" | "ringing" | "in-progress" | "completed" | "busy" | "no-answer" | "canceled" | "failed";
+  severity: number;
+  initiated_at: string;
+  completed_at?: string | null;
+  duration?: number | null;
+  error_message?: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface CallsResponse {
+  calls: CallAlert[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface VoiceConfigStatus {
+  sdk_available: boolean;
+  configured: boolean;
+  enabled: boolean;
+  from_number_masked: string;
+  to_number_masked: string;
+  min_severity: number;
+  cooldown_seconds: number;
+  callback_configured: boolean;
 }

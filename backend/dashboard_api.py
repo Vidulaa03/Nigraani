@@ -14,11 +14,25 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
-from backend.database import DB_PATH, ORDERS, USERS, get_connection
+from backend.database import DB_PATH, ORDERS, USERS, get_connection, get_calls_for_incident
 from backend.ml.anomaly_detector import AnomalyDetector, ModelNotFoundError
 from backend.ml.features import FEATURE_NAMES, extract_windows, parse_timestamp
+from backend.notification_service import (
+    get_notification,
+    get_unread_count,
+    list_notifications,
+    set_all_notifications_read,
+    set_notification_read,
+)
+from backend.twilio_service import (
+    get_call_details,
+    get_voice_config_status,
+    handle_twilio_callback,
+    list_calls,
+    trigger_manual_test_call,
+)
 
 router = APIRouter(tags=["dashboard"])
 
@@ -730,6 +744,23 @@ def investigate_event(event_id: int) -> dict[str, Any]:
             "total_decisions_for_ip": len(all_decisions),
         }
 
+    calls = []
+    if latest_decision:
+        calls = get_calls_for_incident(f"decision-{latest_decision.get('decision_id')}")
+    if not calls:
+        with get_connection() as conn:
+            call_rows = conn.execute(
+                "SELECT * FROM call_alerts WHERE metadata LIKE ? ORDER BY call_id DESC",
+                (f"%{event['ip']}%",),
+            ).fetchall()
+            calls = [dict(r) for r in call_rows]
+            for c in calls:
+                if c.get("metadata") and isinstance(c["metadata"], str):
+                    try:
+                        c["metadata"] = json.loads(c["metadata"])
+                    except Exception:
+                        c["metadata"] = {}
+
     lifecycle = [
         {
             "stage": 1,
@@ -786,6 +817,20 @@ def investigate_event(event_id: int) -> dict[str, Any]:
                 "risk_score": latest_decision.get("risk_score", 0) if latest_decision else 0,
             },
         },
+        {
+            "stage": 6,
+            "name": "VOICE ALERTING & NOTIFICATION",
+            "title": "Twilio Outbound Calling & In-App Alert",
+            "status": (
+                "CALLED"
+                if any(c.get("status") in {"completed", "in-progress", "ringing", "initiated"} for c in calls)
+                else ("ATTEMPTED" if calls else "STANDBY")
+            ),
+            "data": {
+                "calls_count": len(calls),
+                "calls": calls,
+            },
+        },
     ]
 
     return {
@@ -795,4 +840,123 @@ def investigate_event(event_id: int) -> dict[str, Any]:
         "ml_window": ml_window,
         "decision": latest_decision,
         "lifecycle": lifecycle,
+        "calls": calls,
     }
+
+
+# ==============================================================================
+# In-App Notification Endpoints
+# ==============================================================================
+
+
+@router.get("/notifications")
+def get_notifications_api(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    unread_only: bool = Query(False),
+    severity_band: str | None = Query(None),
+) -> dict[str, Any]:
+    items, total = list_notifications(
+        limit=limit,
+        offset=offset,
+        unread_only=unread_only,
+        severity_band=severity_band,
+    )
+    unread_count = get_unread_count()
+    return {
+        "notifications": items,
+        "total": total,
+        "unread_count": unread_count,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.get("/notifications/unread-count")
+def get_notifications_unread_count_api() -> dict[str, int]:
+    return {"unread_count": get_unread_count()}
+
+
+@router.post("/notifications/{notification_id}/read")
+def mark_notification_read_api(notification_id: int) -> dict[str, Any]:
+    notif = get_notification(notification_id)
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    success = set_notification_read(notification_id)
+    return {
+        "success": success,
+        "notification_id": notification_id,
+        "unread_count": get_unread_count(),
+    }
+
+
+@router.post("/notifications/read-all")
+def mark_all_notifications_read_api() -> dict[str, Any]:
+    updated_count = set_all_notifications_read()
+    return {
+        "success": True,
+        "updated_count": updated_count,
+        "unread_count": 0,
+    }
+
+
+# ==============================================================================
+# Twilio Outbound Voice Calling Endpoints
+# ==============================================================================
+
+
+@router.get("/calls/config")
+def get_calls_config_api() -> dict[str, Any]:
+    return get_voice_config_status()
+
+
+@router.get("/calls")
+def get_calls_api(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    incident_id: str | None = Query(None),
+) -> dict[str, Any]:
+    calls, total = list_calls(limit=limit, offset=offset, incident_id=incident_id)
+    return {
+        "calls": calls,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+@router.get("/calls/{call_id_or_sid}")
+def get_call_by_id_or_sid_api(call_id_or_sid: str) -> dict[str, Any]:
+    call = get_call_details(call_id_or_sid)
+    if not call and call_id_or_sid.isdigit():
+        from backend.database import get_call_alert_by_id
+        call = get_call_alert_by_id(int(call_id_or_sid))
+        if call:
+            from backend.twilio_service import mask_phone_number
+            call["to_number"] = mask_phone_number(call.get("to_number"))
+            call["from_number"] = mask_phone_number(call.get("from_number"))
+    if not call:
+        raise HTTPException(status_code=404, detail="Call record not found")
+    return call
+
+
+@router.post("/calls/test")
+def trigger_test_call_api() -> dict[str, Any]:
+    result = trigger_manual_test_call()
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=400 if result.get("status") == "skipped" else 502,
+            detail=result.get("reason") or result.get("error") or "Failed to initiate test call",
+        )
+    return result
+
+
+@router.post("/calls/callback")
+async def twilio_callback_webhook(request: Request) -> dict[str, Any]:
+    form_data = await request.form()
+    payload = {k: str(v) for k, v in form_data.items()}
+    signature = request.headers.get("X-Twilio-Signature")
+    url = str(request.url)
+    res = handle_twilio_callback(payload, signature=signature, url=url)
+    return res
+

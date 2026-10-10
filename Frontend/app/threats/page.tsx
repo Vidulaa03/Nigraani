@@ -95,16 +95,16 @@ export default function ThreatIntelligencePage() {
         {/* Intelligence Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Attack Types Breakdown */}
-          <div className="bg-[#ffffff] border border-[#e5e0d5] rounded-none p-5">
+          <div className="bg-[#FFFFFF] border border-[#D5EAE5] rounded-sm p-5">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#27251f]">
+              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#02353C]">
                 Attack Type Breakdown
               </h3>
-              <span className="text-[10px] font-sans px-2 py-0.5 rounded-none bg-amber-500/10 text-amber-800 border border-amber-500/30">
+              <span className="text-[10px] font-sans px-2 py-0.5 rounded-sm bg-[#3FD0C9]/15 text-[#02353C] border border-[#3FD0C9]/40 font-semibold">
                 OWASP API Top 10
               </span>
             </div>
-            <p className="text-[11px] text-[#716c60] font-sans mb-4">
+            <p className="text-[11px] text-[#486966] font-sans mb-4">
               Detections by specific exploit category
             </p>
 
@@ -132,26 +132,26 @@ export default function ThreatIntelligencePage() {
                         setSelectedType(selectedType === item.attack_type ? "ALL" : item.attack_type);
                       }
                     }}
-                    className={`p-3 rounded-none border transition-all cursor-pointer ${
+                    className={`p-3 rounded-sm border transition-all cursor-pointer ${
                       selectedType === item.attack_type
-                        ? "bg-[#ffffff] border-amber-500/50"
-                        : "bg-[#ffffff] border-[#e5e0d5] hover:border-amber-500/30"
+                        ? "bg-[#F2FBF9] border-[#2EAF7D]"
+                        : "bg-[#FFFFFF] border-[#D5EAE5] hover:border-[#2EAF7D]/60"
                     }`}
                   >
                     <div className="flex justify-between items-center text-xs font-sans mb-1.5">
-                      <span className="font-semibold text-[#27251f]">
+                      <span className="font-semibold text-[#02353C]">
                         {item.attack_type}
                       </span>
-                      <span className="text-amber-800 font-bold">
+                      <span className="text-[#02353C] font-mono font-bold">
                         {item.count}{" "}
-                        <span className="text-[#716c60] text-[10px]">
+                        <span className="text-[#486966] text-[10px] font-sans">
                           ({pct}%)
                         </span>
                       </span>
                     </div>
-                    <div className="w-full bg-[#ffffff] rounded-none h-1.5 overflow-hidden">
+                    <div className="w-full bg-[#EAF8F5] rounded-sm h-1.5 overflow-hidden">
                       <div
-                        className="bg-amber-400 h-1.5 rounded-none"
+                        className="bg-[#2EAF7D] h-1.5 rounded-sm"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -162,16 +162,16 @@ export default function ThreatIntelligencePage() {
           </div>
 
           {/* Severity Distribution */}
-          <div className="bg-[#ffffff] border border-[#e5e0d5] rounded-none p-5">
+          <div className="bg-[#FFFFFF] border border-[#D5EAE5] rounded-sm p-5">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#27251f]">
+              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#02353C]">
                 Severity Distribution
               </h3>
-              <span className="text-[10px] font-sans px-2 py-0.5 rounded-none bg-orange-500/10 text-orange-700 border border-orange-500/30">
+              <span className="text-[10px] font-sans px-2 py-0.5 rounded-sm bg-[#2EAF7D]/15 text-[#02353C] border border-[#2EAF7D]/40 font-semibold">
                 Risk Rating
               </span>
             </div>
-            <p className="text-[11px] text-[#716c60] font-sans mb-4">
+            <p className="text-[11px] text-[#486966] font-sans mb-4">
               Relative proportion of threat severities
             </p>
 
@@ -191,16 +191,16 @@ export default function ThreatIntelligencePage() {
           </div>
 
           {/* Most Active Threat Source IPs */}
-          <div className="bg-[#ffffff] border border-[#e5e0d5] rounded-none p-5">
+          <div className="bg-[#FFFFFF] border border-[#D5EAE5] rounded-sm p-5">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#27251f]">
+              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#02353C]">
                 Top Attacking IPs
               </h3>
-              <span className="text-[10px] font-sans px-2 py-0.5 rounded-none bg-red-500/10 text-red-700 border border-red-500/30">
+              <span className="text-[10px] font-sans px-2 py-0.5 rounded-sm bg-[#DC2626]/10 text-[#DC2626] border border-[#DC2626]/30 font-semibold">
                 Perpetrators
               </span>
             </div>
-            <p className="text-[11px] text-[#716c60] font-sans mb-4">
+            <p className="text-[11px] text-[#486966] font-sans mb-4">
               Source addresses generating the highest detection count
             </p>
 
@@ -208,18 +208,18 @@ export default function ThreatIntelligencePage() {
               {(data?.top_source_ips || []).slice(0, 6).map((ipItem) => (
                 <div
                   key={ipItem.ip}
-                  className="p-2.5 rounded-none bg-[#ffffff] border border-[#e5e0d5] flex items-center justify-between text-xs font-sans"
+                  className="p-2.5 rounded-sm bg-[#F2FBF9] border border-[#D5EAE5] flex items-center justify-between text-xs font-sans"
                 >
                   <div>
-                    <div className="font-semibold text-amber-800">{ipItem.ip}</div>
-                    <div className="text-[10px] text-[#716c60] mt-0.5">
-                      Severity: {ipItem.highest_severity} | Action:{" "}
-                      <span className="text-red-700 font-bold">
+                    <div className="font-mono font-semibold text-[#02353C]">{ipItem.ip}</div>
+                    <div className="text-[10px] text-[#486966] mt-0.5">
+                      Severity: <span className="font-semibold text-[#02353C]">{ipItem.highest_severity}</span> | Action:{" "}
+                      <span className="text-[#DC2626] font-bold">
                         {ipItem.action}
                       </span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-none bg-[#ffffff] text-[#27251f] font-bold text-xs border border-[#e5e0d5]">
+                  <span className="px-2 py-0.5 rounded-sm bg-[#FFFFFF] text-[#02353C] font-mono font-bold text-xs border border-[#D5EAE5]">
                     {ipItem.count} hits
                   </span>
                 </div>
@@ -229,12 +229,12 @@ export default function ThreatIntelligencePage() {
         </div>
 
         {/* Most Targeted Endpoints */}
-        <div className="bg-[#ffffff] border border-[#e5e0d5] rounded-none p-5">
+        <div className="bg-[#FFFFFF] border border-[#D5EAE5] rounded-sm p-5">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#27251f]">
+            <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#02353C]">
               Most Targeted Endpoints
             </h3>
-            <span className="text-[10px] font-sans text-[#716c60]">
+            <span className="text-[10px] font-sans text-[#486966]">
               Linked from detection telemetry
             </span>
           </div>
@@ -242,12 +242,12 @@ export default function ThreatIntelligencePage() {
             {(data?.top_endpoints || []).slice(0, 8).map((ep) => (
               <div
                 key={ep.endpoint}
-                className="p-3 rounded-none bg-[#ffffff] border border-[#e5e0d5] flex items-center justify-between"
+                className="p-3 rounded-sm bg-[#F2FBF9] border border-[#D5EAE5] flex items-center justify-between"
               >
-                <div className="text-xs font-sans text-[#27251f] truncate max-w-[200px]" title={ep.endpoint}>
+                <div className="text-xs font-mono text-[#02353C] truncate max-w-[200px]" title={ep.endpoint}>
                   {ep.endpoint}
                 </div>
-                <span className="text-xs font-sans px-2 py-0.5 rounded-none bg-amber-500/10 text-amber-800 border border-amber-500/20 font-bold">
+                <span className="text-xs font-mono px-2 py-0.5 rounded-sm bg-[#2EAF7D]/10 text-[#02353C] border border-[#2EAF7D]/30 font-bold">
                   {ep.count}
                 </span>
               </div>
@@ -259,10 +259,10 @@ export default function ThreatIntelligencePage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#27251f]">
+              <h3 className="text-xs font-sans font-bold uppercase tracking-wider text-[#02353C]">
                 Detailed Security Detections Register
               </h3>
-              <p className="text-[11px] text-[#716c60] font-sans">
+              <p className="text-[11px] text-[#486966] font-sans">
                 {selectedType === "ALL"
                   ? `Showing all ${data?.detections.length || 0} detections`
                   : `Filtered by ${selectedType} (${filteredDetections.length} detections)`}
@@ -272,9 +272,9 @@ export default function ThreatIntelligencePage() {
             {selectedType !== "ALL" && (
               <button
                 onClick={() => setSelectedType("ALL")}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-none bg-[#ffffff] text-amber-800 border border-[#e5e0d5] text-xs font-sans hover:bg-[#ffffff]"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-[#FFFFFF] text-[#02353C] border border-[#D5EAE5] text-xs font-sans hover:bg-[#F2FBF9]"
               >
-                <Filter className="w-3 h-3" />
+                <Filter className="w-3 h-3 text-[#2EAF7D]" />
                 Clear filter ({selectedType})
               </button>
             )}

@@ -26,10 +26,10 @@ const SUPPORTED_DETECTORS = new Set(["enumeration_detector", "rate_detector"]);
 
 function ReportList({ items }: { items: string[] }) {
   return (
-    <ul className="space-y-2 text-xs leading-5 text-[#464238]">
+    <ul className="space-y-2 text-xs leading-5 text-[#486966]">
       {items.map((item, index) => (
         <li key={`${index}-${item}`} className="flex gap-2">
-          <span aria-hidden="true" className="mt-2 h-1.5 w-1.5 shrink-0 bg-amber-700" />
+          <span aria-hidden="true" className="mt-2 h-1.5 w-1.5 shrink-0 rounded-sm bg-[#2EAF7D]" />
           <span>{item}</span>
         </li>
       ))}
@@ -45,8 +45,8 @@ function ReportSection({
   children: ReactNode;
 }) {
   return (
-    <section className="border border-[#e5e0d5] bg-white p-4 sm:p-5">
-      <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#27251f]">
+    <section className="border border-[#D5EAE5] bg-[#FFFFFF] rounded-sm p-4 sm:p-5">
+      <h4 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#02353C]">
         {title}
       </h4>
       {children}
@@ -57,50 +57,50 @@ function ReportSection({
 function ReportBody({ report }: { report: InvestigationReport }) {
   return (
     <div className="space-y-4">
-      <div className="border border-amber-500/30 bg-amber-500/5 p-4" role="note">
+      <div className="border border-[#2EAF7D]/40 bg-[#2EAF7D]/5 rounded-sm p-4" role="note">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-[#02353C]">
             Incident summary
           </h4>
           <SeverityBadge band={report.severityBand} score={report.severity} />
         </div>
-        <p className="text-sm leading-6 text-[#27251f]">{report.summary}</p>
+        <p className="text-sm leading-6 text-[#02353C]">{report.summary}</p>
       </div>
 
       <ReportSection title={`Related API events (${report.relatedEvents.length})`}>
-        <ol className="divide-y divide-[#eeeae1]">
+        <ol className="divide-y divide-[#D5EAE5]">
           {report.relatedEvents.map((event) => (
             <li key={event.eventId} className="py-3 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="border border-[#e5e0d5] bg-[#faf9f6] px-2 py-1 font-mono font-semibold text-[#27251f]">
+                <span className="border border-[#D5EAE5] bg-[#F2FBF9] px-2 py-0.5 rounded-sm font-mono font-semibold text-[#02353C]">
                   Event #{event.eventId}
                 </span>
                 {event.timestamp && (
-                  <span className="text-[#716c60]">{formatDateTime(event.timestamp)}</span>
+                  <span className="text-[#486966] font-mono text-[11px]">{formatDateTime(event.timestamp)}</span>
                 )}
                 {event.statusCode !== undefined && (
-                  <span className={`font-semibold ${event.statusCode >= 400 ? "text-orange-800" : "text-emerald-800"}`}>
+                  <span className={`font-semibold font-mono text-[11px] ${event.statusCode >= 400 ? "text-[#DC2626]" : "text-[#449342]"}`}>
                     HTTP {event.statusCode}
                   </span>
                 )}
               </div>
               {event.method && event.endpoint ? (
-                <p className="mt-2 break-all font-mono text-xs text-[#464238]">
-                  <span className="mr-2 font-bold text-amber-800">{event.method}</span>
+                <p className="mt-2 break-all font-mono text-xs text-[#02353C]">
+                  <span className="mr-2 font-bold text-[#2EAF7D]">{event.method}</span>
                   {event.endpoint}
                   {event.responseTimeMs !== undefined && (
-                    <span className="ml-2 font-sans text-[#716c60]">
+                    <span className="ml-2 font-sans text-[#486966]">
                       {event.responseTimeMs.toFixed(1)} ms
                     </span>
                   )}
                 </p>
               ) : (
-                <p className="mt-2 text-xs text-[#716c60]">
+                <p className="mt-2 text-xs text-[#486966]">
                   Event details are outside the current event listing; this ID is referenced by detector evidence.
                 </p>
               )}
               {event.detectorEvidence.length > 0 && (
-                <p className="mt-2 border-l-2 border-amber-700/40 pl-2 text-xs leading-5 text-[#5d584d]">
+                <p className="mt-2 border-l-2 border-[#2EAF7D] pl-2 text-xs leading-5 text-[#486966]">
                   {event.detectorEvidence.join(" ")}
                 </p>
               )}
@@ -117,8 +117,8 @@ function ReportBody({ report }: { report: InvestigationReport }) {
           <ul className="space-y-3">
             {report.possiblePatterns.map((pattern) => (
               <li key={pattern.title}>
-                <div className="mb-1 text-xs font-semibold text-[#27251f]">{pattern.title}</div>
-                <p className="text-xs leading-5 text-[#5d584d]">{pattern.detail}</p>
+                <div className="mb-1 text-xs font-semibold text-[#02353C]">{pattern.title}</div>
+                <p className="text-xs leading-5 text-[#486966]">{pattern.detail}</p>
               </li>
             ))}
           </ul>
@@ -134,20 +134,20 @@ function ReportBody({ report }: { report: InvestigationReport }) {
       <ReportSection title="Recommended next steps · human approval required">
         <ol className="space-y-3">
           {report.nextSteps.map(({ recommendation }, index) => (
-            <li key={recommendation} className="flex gap-3 text-xs leading-5 text-[#464238]">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center border border-[#e5e0d5] bg-[#faf9f6] font-mono text-[10px] text-[#716c60]">
+            <li key={recommendation} className="flex gap-3 text-xs leading-5 text-[#02353C]">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center border border-[#D5EAE5] bg-[#F2FBF9] rounded-sm font-mono text-[10px] text-[#486966]">
                 {index + 1}
               </span>
               <span>
                 {recommendation}
-                <span className="mt-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                <span className="mt-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[#2EAF7D]">
                   <ClipboardCheck className="h-3 w-3" /> Operator review and approval required
                 </span>
               </span>
             </li>
           ))}
         </ol>
-        <p className="mt-4 border-t border-[#e5e0d5] pt-3 text-[11px] text-[#716c60]">
+        <p className="mt-4 border-t border-[#D5EAE5] pt-3 text-[11px] text-[#486966]">
           Recommendations are informational. This report does not block, throttle, or change access.
         </p>
       </ReportSection>
@@ -182,17 +182,17 @@ export function InvestigationReportPanel({ trail }: InvestigationReportPanelProp
   }, [generateReport, supportsReport]);
 
   return (
-    <section className="space-y-4 border border-[#e5e0d5] bg-[#f8f6f1] p-4 sm:p-5" aria-labelledby="investigation-report-title">
-      <div className="flex flex-col gap-3 border-b border-[#e5e0d5] pb-4 sm:flex-row sm:items-center sm:justify-between">
+    <section className="space-y-4 border border-[#D5EAE5] bg-[#F2FBF9] rounded-sm p-4 sm:p-5 shadow-sm" aria-labelledby="investigation-report-title">
+      <div className="flex flex-col gap-3 border-b border-[#D5EAE5] pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-amber-500/30 bg-white text-amber-800">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center border border-[#D5EAE5] bg-[#FFFFFF] rounded-sm text-[#2EAF7D]">
             <FileSearch className="h-4 w-4" />
           </span>
           <div>
-            <h3 id="investigation-report-title" className="text-sm font-bold uppercase tracking-wide text-[#27251f]">
+            <h3 id="investigation-report-title" className="text-sm font-bold uppercase tracking-wide text-[#02353C]">
               LLM Investigation Report
             </h3>
-            <p className="mt-1 text-xs text-[#716c60]">
+            <p className="mt-1 text-xs text-[#486966]">
               Triage summary for API enumeration and rate-spike detections
             </p>
           </div>
@@ -202,16 +202,16 @@ export function InvestigationReportPanel({ trail }: InvestigationReportPanelProp
             type="button"
             onClick={() => void generateReport()}
             disabled={loading}
-            className="inline-flex min-h-9 items-center justify-center gap-2 border border-[#ded7ca] bg-white px-3 py-2 text-xs font-medium text-[#464238] hover:bg-[#faf9f6] disabled:cursor-wait disabled:opacity-60"
+            className="inline-flex min-h-9 items-center justify-center gap-2 border border-[#D5EAE5] bg-[#FFFFFF] rounded-sm px-3 py-2 text-xs font-medium text-[#02353C] hover:bg-[#F2FBF9] disabled:cursor-wait disabled:opacity-60 transition-colors"
           >
-            {loading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            {loading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin text-[#2EAF7D]" /> : <RefreshCw className="h-3.5 w-3.5 text-[#2EAF7D]" />}
             {report ? "Refresh demo report" : "Generate demo report"}
           </button>
         )}
       </div>
 
-      <div className="flex items-start gap-2 border border-violet-300 bg-violet-50 px-3 py-2.5 text-xs leading-5 text-violet-950" role="note">
-        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <div className="flex items-start gap-2 border border-[#3FD0C9]/40 bg-[#FFFFFF] rounded-sm px-3 py-2.5 text-xs leading-5 text-[#02353C]" role="note">
+        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#2EAF7D]" />
         <p>
           <strong>Demo template · not an LLM response.</strong> Observed facts come from existing event and detector records; hypotheses and recommendations are deterministic examples. The report adapter is isolated for later backend/LLM integration.
         </p>
@@ -225,17 +225,17 @@ export function InvestigationReportPanel({ trail }: InvestigationReportPanelProp
           className="bg-white"
         />
       ) : loading ? (
-        <div className="flex min-h-32 items-center justify-center gap-3 border border-dashed border-[#ded7ca] bg-white p-6 text-xs text-[#716c60]" role="status" aria-live="polite">
-          <LoaderCircle className="h-4 w-4 animate-spin text-amber-800" />
+        <div className="flex min-h-32 items-center justify-center gap-3 border border-dashed border-[#D5EAE5] bg-[#FFFFFF] rounded-sm p-6 text-xs text-[#486966]" role="status" aria-live="polite">
+          <LoaderCircle className="h-4 w-4 animate-spin text-[#2EAF7D]" />
           Gathering linked event rows and preparing the demo template…
         </div>
       ) : error ? (
-        <div className="flex flex-col items-start gap-3 border border-red-300 bg-red-50 p-4 text-xs text-red-900" role="alert">
+        <div className="flex flex-col items-start gap-3 border border-red-300 bg-red-50 rounded-sm p-4 text-xs text-red-900" role="alert">
           <div className="flex items-center gap-2 font-semibold">
             <AlertCircle className="h-4 w-4" /> Report unavailable
           </div>
           <p>{error}</p>
-          <button type="button" onClick={() => void generateReport()} className="border border-red-300 bg-white px-3 py-2 font-medium hover:bg-red-50">
+          <button type="button" onClick={() => void generateReport()} className="border border-red-300 bg-white px-3 py-2 font-medium hover:bg-red-50 rounded-sm">
             Try again
           </button>
         </div>
