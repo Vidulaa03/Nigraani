@@ -12,7 +12,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-"%PYTHON%" -c "import fastapi, uvicorn, pandas, sklearn, joblib" >nul 2>&1
+"%PYTHON%" -c "import fastapi, uvicorn, pandas, sklearn, joblib, prometheus_client" >nul 2>&1
 if errorlevel 1 (
     echo Required packages are missing. Run:
     echo   "%PYTHON%" -m pip install -r backend\requirements.txt
@@ -20,10 +20,9 @@ if errorlevel 1 (
 )
 
 if not exist "models\iforest.joblib" (
-    echo The trained model is missing: models\iforest.joblib
-    echo Train on verified normal traffic before starting the analyzer:
-    echo   "%PYTHON%" -m ml.train_model path\to\normal_events.json
-    exit /b 1
+    echo Warning: models\iforest.joblib is missing; the analyzer will use rule detection only.
+    echo To enable ML, collect verified normal traffic and run:
+    echo   "%PYTHON%" -m backend.ml.train_model
 )
 
 curl.exe -fsS --max-time 2 http://127.0.0.1:8000/ >nul 2>&1

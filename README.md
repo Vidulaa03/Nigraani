@@ -53,22 +53,24 @@ separate terminal windows.
 ## Tests
 
 ```powershell
-python -m pip install pytest
+python -m pip install -r backend\requirements-dev.txt
 python -m pytest
 ```
 
 ## Train the anomaly model
 
-Collect normal API traffic, then save an event JSON file containing only
-verified normal events. Do not use attack traffic in the training file.
+Collect verified normal API traffic in the local database before training.
+The trainer uses the existing `sim_label` field only to select normal windows;
+it does not feed labels into the model as features.
 
 ```powershell
-python -m ml.train_model path\to\normal_events.json
+python -m backend.ml.train_model
 ```
 
-The analyzer uses the saved model at `models\iforest.joblib` and reports a
-clear error if it has not been trained. Event labels are not used by detectors,
-feature extraction, training, or inference.
+The dashboard and analyzer load the saved model at `models\iforest.joblib`.
+If it is absent, the analyzer logs a warning and continues with rule detection;
+the dashboard reports that ML is unavailable. Event labels are not used by
+detectors, feature extraction, or inference.
 
 After training, run the analyzer in a separate terminal:
 

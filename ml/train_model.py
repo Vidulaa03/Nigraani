@@ -11,7 +11,9 @@ from sklearn.ensemble import IsolationForest
 
 from ml.features import FEATURE_COLUMNS, extract_features
 
-MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "iforest.joblib"
+# This legacy standalone pipeline has a distinct artifact so it cannot overwrite
+# the dashboard/analyzer bundle produced by backend.ml.train_model.
+MODEL_PATH = Path(__file__).resolve().parent.parent / "models" / "iforest-legacy.joblib"
 
 
 def train_model(

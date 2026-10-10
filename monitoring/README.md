@@ -1,21 +1,21 @@
 # NIGRAANI local monitoring on native Windows
 
-This setup runs the existing FastAPI app on port **8000**, the existing analyzer metrics endpoint on **8001**, Prometheus on **9090**, Grafana on **3001**, and leaves the Next.js frontend on **3002** as currently configured for this workspace. It uses native Windows processes and the Grafana Windows service; it does not use containers. Grafana reads `conf/custom.ini` (never edit `defaults.ini`) and must be restarted after configuration changes. See [Grafana's Windows startup and configuration instructions](https://grafana.com/docs/grafana/latest/setup-grafana/start-restart-grafana/) and [configuration locations](https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/).
+This setup runs the existing FastAPI app on port **8000**, the existing analyzer metrics endpoint on **8001**, Prometheus on **9090**, Grafana on **3001**, and preserves the Next.js frontend on **3000**. It uses native Windows processes and the Grafana Windows service; it does not use containers. Grafana reads `conf/custom.ini` (never edit `defaults.ini`) and must be restarted after configuration changes. See [Grafana's Windows startup and configuration instructions](https://grafana.com/docs/grafana/latest/setup-grafana/start-restart-grafana/) and [configuration locations](https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/).
 
 ## Prerequisites and ports
 
 - Project virtual environment `.venv` and backend dependencies from `backend\requirements.txt`.
 - Native Grafana OSS Windows installer/service from Grafana Labs.
 - Prometheus **Windows AMD64 ZIP** from <https://prometheus.io/download/>. Choose the `windows-amd64` archive, not a `darwin-amd64` macOS build. Do not commit the ZIP or extracted binaries.
-- Ports 3002 (Next.js), 3001 (Grafana), 8000 (FastAPI), 8001 (analyzer metrics), and 9090 (Prometheus). Check availability in PowerShell before starting:
+- Ports 3000 (Next.js), 3001 (Grafana), 8000 (FastAPI), 8001 (analyzer metrics), and 9090 (Prometheus). Check availability in PowerShell before starting:
 
 ```powershell
 Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
-  Where-Object { $_.LocalPort -in 3001, 3002, 8000, 8001, 9090 } |
+  Where-Object { $_.LocalPort -in 3000, 3001, 8000, 8001, 9090 } |
   Select-Object LocalAddress, LocalPort, OwningProcess
 ```
 
-The checked in Prometheus FastAPI scrape target is `127.0.0.1:8000`, matching the existing README command (`uvicorn backend.main:app --reload`) and its default port. The separately started analyzer serves its own process-local metrics on `127.0.0.1:8001/metrics`; this is necessary because its real detection and risk calculations run in a separate process. If you deliberately start Uvicorn on another port, update `monitoring\prometheus.yml` accordingly. The expected app URLs are `http://localhost:3002`, `http://localhost:3001`, and `http://localhost:9090`; FastAPI metrics are at `http://localhost:8000/metrics` and analyzer metrics at `http://localhost:8001/metrics`.
+The checked in Prometheus FastAPI scrape target is `127.0.0.1:8000`, matching the existing README command (`uvicorn backend.main:app --reload`) and its default port. The separately started analyzer serves its own process-local metrics on `127.0.0.1:8001/metrics`; this is necessary because its real detection and risk calculations run in a separate process. If you deliberately start Uvicorn on another port, update `monitoring\prometheus.yml` accordingly. The expected app URLs are `http://localhost:3000`, `http://localhost:3001`, and `http://localhost:9090`; FastAPI metrics are at `http://localhost:8000/metrics` and analyzer metrics at `http://localhost:8001/metrics`.
 
 ## 1. Install dependencies and start FastAPI
 
@@ -66,7 +66,7 @@ Validate the repository configuration with the extracted Windows tool (run from 
 
 ## 3. Set Grafana's native Windows port to 3001
 
-Next.js retains its existing port 3002. The repository file `monitoring\grafana\custom.ini` records the Grafana settings; copying a repo config alone does not reconfigure an already installed Windows service.
+Next.js retains its existing port 3000. The repository file `monitoring\grafana\custom.ini` records the Grafana settings; copying a repo config alone does not reconfigure an already installed Windows service.
 
 1. Find the installed Grafana folder. This machine's service uses `C:\Program Files\GrafanaLabs\grafana`, with config at `C:\Program Files\GrafanaLabs\grafana\conf\custom.ini`. For another installation, inspect **Services → Grafana → Properties → Path to executable** (or locate `grafana-server.exe`). The executable's working/install directory contains `conf`.
 2. Stop the Windows service from an elevated PowerShell: `Stop-Service -Name Grafana`.
@@ -86,7 +86,7 @@ Next.js retains its existing port 3002. The repository file `monitoring\grafana\
    Get-NetTCPConnection -State Listen -LocalPort 3001
    ```
 
-   Also confirm Next.js remains available at `http://localhost:3002`. If the running service continues to bind another port, inspect its service executable arguments for a `--config` override and edit that configured INI file instead. Do not change the frontend's port.
+   Also confirm Next.js remains available at `http://localhost:3000`. If the running service continues to bind another port, inspect its service executable arguments for a `--config` override and edit that configured INI file instead. Do not change the frontend's port.
 
 ## 4. Configure Grafana and load the dashboard
 
@@ -96,7 +96,7 @@ Import `monitoring\grafana\dashboards\nigraani-overview.json` via **Dashboards �
 
 ## 5. Generate and check real activity
 
-Start the Next.js app from `frontend` in another terminal with `npm run dev -- -p 3002` (`http://localhost:3002`). This passes the existing port at startup without changing the package script or Next.js config. Visit it and make regular API calls to FastAPI, for example:
+Start the Next.js app from `Frontend` in another terminal with `npm run dev` (`http://localhost:3000`). The directory uses this capitalization in Git; Windows paths are case-insensitive. The existing Next.js default remains unchanged. Visit it and make regular API calls to FastAPI, for example:
 
 ```powershell
 Invoke-WebRequest http://127.0.0.1:8000/ -UseBasicParsing
@@ -127,7 +127,7 @@ No metrics include request bodies, credentials, identity values, IPs, query stri
 - **Prometheus target DOWN / connection refused:** make sure Uvicorn is still running at port 8000 and `/metrics` returns exposition text. Start `python -m backend.analyzer` for the analyzer target at port 8001. Confirm `monitoring\prometheus.yml` targets and Uvicorn port match. Check Windows listeners with `Get-NetTCPConnection -State Listen`.
 - **`/metrics` returns 404:** confirm the updated backend process imports `backend.main:app`, then restart Uvicorn.
 - **Grafana cannot connect to Prometheus:** use `http://localhost:9090` as data source URL; confirm Prometheus `/-/ready` responds locally and no port conflict.
-- **Grafana or Next.js port conflict:** keep Grafana on 3001 and Next.js on 3002. Check listeners with `Get-NetTCPConnection -State Listen` and verify both URLs independently.
+- **Grafana or Next.js port conflict:** keep Grafana on 3001 and Next.js on 3000. Check listeners with `Get-NetTCPConnection -State Listen` and verify both URLs independently.
 - **Prometheus YAML parse error:** run `promtool.exe check config .\monitoring\prometheus.yml` from the repository root; use the repository YAML, not the distribution's example file.
 - **Windows executable/PATH problem:** invoke `prometheus.exe` and `promtool.exe` by explicit extracted paths and ensure the ZIP folder name ends in `windows-amd64`.
 - **Windows firewall/localhost:** keep services bound to loopback as configured. Do not disable Windows Defender or open public firewall rules for this local setup.

@@ -8,6 +8,8 @@ import { api } from "@/lib/api";
 import { SystemHealth } from "@/lib/types";
 import { useVisibilityInterval } from "@/lib/useVisibilityInterval";
 
+import { NotificationToast } from "../notifications/NotificationToast";
+
 interface DashboardContextType {
   health: SystemHealth | null;
   backendOnline: boolean;
@@ -95,7 +97,7 @@ export function AppLayout({
         offlineError,
       }}
     >
-      <div className="flex min-h-screen bg-[#f7f5ef] text-[#27251f]">
+      <div className="flex min-h-screen bg-[#EAF8F5] text-[#02353C]">
         {/* Persistent Left Sidebar */}
         <Sidebar
           health={health}
@@ -132,11 +134,15 @@ export function AppLayout({
           )}
 
           {/* Dynamic Page Content */}
-          <main className="flex-1 p-6 lg:p-8 max-w-[1700px] w-full mx-auto">
+          <main className="flex-1 p-5 sm:p-6 lg:p-8 max-w-[1700px] w-full mx-auto">
             {children}
           </main>
         </div>
+
+        {/* Live Notification Alert Toast Banner */}
+        <NotificationToast />
       </div>
     </DashboardContext.Provider>
   );
 }
+

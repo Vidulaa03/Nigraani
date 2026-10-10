@@ -44,13 +44,13 @@ export default function SingleEventInvestigationPage() {
   return (
     <AppLayout
       title={`INVESTIGATION: EVENT #${eventId || ""}`}
-      subtitle="5-Stage Root Cause Analysis & Security Verdict Stepper"
+      subtitle="6-Stage Root Cause Analysis, Security Verdict & Voice Alert Dispatch"
       onRefresh={handleRefresh}
       isRefreshing={refreshing}
     >
       {loading ? (
-        <div className="p-16 text-center text-xs font-sans text-[#716c60] bg-[#ffffff] border border-[#e5e0d5] rounded-none">
-          Tracing event #{eventId} through detections, ML pipeline, and risk engine...
+        <div className="p-16 text-center text-xs font-sans text-[#486966] bg-[#FFFFFF] border border-[#D5EAE5] rounded-sm">
+          Tracing event #{eventId} through detections, ML pipeline, risk engine, and automated notifications...
         </div>
       ) : error ? (
         <EmptyState

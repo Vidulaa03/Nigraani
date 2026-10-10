@@ -230,6 +230,74 @@ def init_db() -> Path:
             """
         )
 
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS notifications (
+                notification_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                incident_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                severity INTEGER NOT NULL,
+                severity_band TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                is_read INTEGER NOT NULL DEFAULT 0,
+                recipient TEXT NOT NULL DEFAULT 'soc-analyst',
+                idempotency_key TEXT UNIQUE NOT NULL,
+                metadata TEXT NOT NULL DEFAULT '{}'
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_notifications_created
+            ON notifications(created_at DESC)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_notifications_read
+            ON notifications(is_read)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_notifications_incident
+            ON notifications(incident_id)
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS call_alerts (
+                call_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                call_sid TEXT UNIQUE NOT NULL,
+                incident_id TEXT NOT NULL,
+                notification_id INTEGER,
+                to_number TEXT NOT NULL,
+                from_number TEXT NOT NULL,
+                trigger_reason TEXT NOT NULL,
+                status TEXT NOT NULL,
+                severity INTEGER NOT NULL,
+                initiated_at TEXT NOT NULL,
+                completed_at TEXT,
+                duration INTEGER,
+                error_message TEXT,
+                metadata TEXT NOT NULL DEFAULT '{}'
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_call_alerts_sid
+            ON call_alerts(call_sid)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_call_alerts_incident
+            ON call_alerts(incident_id)
+            """
+        )
+
         for user_id, payload in USERS.items():
             conn.execute(
                 "INSERT OR IGNORE INTO users (user_id, name, email) VALUES (?, ?, ?)",
@@ -516,6 +584,256 @@ def get_order_by_id(order_id: int) -> dict[str, Any] | None:
     with get_connection() as conn:
         row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
     return dict(row) if row else None
+
+
+def get_latest_event_id() -> int:
+    """Return the current event cursor without loading the event history."""
+    with get_connection() as conn:
+        row = conn.execute("SELECT COALESCE(MAX(event_id), 0) AS event_id FROM security_events").fetchone()
+    return int(row["event_id"])
+
+
+def insert_notification(notification: dict[str, Any]) -> int | None:
+    """Insert an in-app notification idempotently based on idempotency_key."""
+    metadata_payload = json.dumps(notification.get("metadata", {}))
+    with get_connection() as conn:
+        try:
+            cursor = conn.execute(
+                """
+                INSERT INTO notifications (
+                    incident_id, title, message, severity, severity_band,
+                    created_at, is_read, recipient, idempotency_key, metadata
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(notification["incident_id"]),
+                    str(notification["title"]),
+                    str(notification["message"]),
+                    int(notification["severity"]),
+                    str(notification["severity_band"]),
+                    str(notification["created_at"]),
+                    1 if notification.get("is_read") else 0,
+                    str(notification.get("recipient", "soc-analyst")),
+                    str(notification["idempotency_key"]),
+                    metadata_payload,
+                ),
+            )
+            conn.commit()
+            return int(cursor.lastrowid)
+        except sqlite3.IntegrityError:
+            row = conn.execute(
+                "SELECT notification_id FROM notifications WHERE idempotency_key = ?",
+                (notification["idempotency_key"],),
+            ).fetchone()
+            return int(row["notification_id"]) if row else None
+
+
+def get_notifications(
+    limit: int = 50,
+    offset: int = 0,
+    unread_only: bool = False,
+    severity_band: str | None = None,
+) -> tuple[list[dict[str, Any]], int]:
+    """Return paginated notifications and total count."""
+    with get_connection() as conn:
+        query = "SELECT * FROM notifications WHERE 1=1"
+        params: list[Any] = []
+        if unread_only:
+            query += " AND is_read = 0"
+        if severity_band:
+            query += " AND UPPER(severity_band) = UPPER(?)"
+            params.append(severity_band)
+
+        count_query = f"SELECT COUNT(*) FROM ({query})"
+        total = conn.execute(count_query, params).fetchone()[0]
+
+        query += " ORDER BY notification_id DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        rows = conn.execute(query, params).fetchall()
+
+    items = []
+    for r in rows:
+        item = dict(r)
+        item["is_read"] = bool(item["is_read"])
+        item["metadata"] = json.loads(item["metadata"]) if item.get("metadata") else {}
+        items.append(item)
+    return items, total
+
+
+def get_notification_by_id(notification_id: int) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM notifications WHERE notification_id = ?",
+            (notification_id,),
+        ).fetchone()
+    if not row:
+        return None
+    item = dict(row)
+    item["is_read"] = bool(item["is_read"])
+    item["metadata"] = json.loads(item["metadata"]) if item.get("metadata") else {}
+    return item
+
+
+def get_unread_notifications_count() -> int:
+    with get_connection() as conn:
+        row = conn.execute("SELECT COUNT(*) FROM notifications WHERE is_read = 0").fetchone()
+    return int(row[0]) if row else 0
+
+
+def mark_notification_read(notification_id: int) -> bool:
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "UPDATE notifications SET is_read = 1 WHERE notification_id = ?",
+            (notification_id,),
+        )
+        conn.commit()
+    return cursor.rowcount > 0
+
+
+def mark_all_notifications_read() -> int:
+    with get_connection() as conn:
+        cursor = conn.execute("UPDATE notifications SET is_read = 1 WHERE is_read = 0")
+        conn.commit()
+    return cursor.rowcount
+
+
+def insert_call_alert(call_alert: dict[str, Any]) -> int:
+    """Insert a persisted outbound voice call record."""
+    metadata_payload = json.dumps(call_alert.get("metadata", {}))
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO call_alerts (
+                call_sid, incident_id, notification_id, to_number, from_number,
+                trigger_reason, status, severity, initiated_at, completed_at,
+                duration, error_message, metadata
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(call_alert["call_sid"]),
+                str(call_alert["incident_id"]),
+                call_alert.get("notification_id"),
+                str(call_alert["to_number"]),
+                str(call_alert["from_number"]),
+                str(call_alert["trigger_reason"]),
+                str(call_alert.get("status", "queued")),
+                int(call_alert.get("severity", 80)),
+                str(call_alert["initiated_at"]),
+                call_alert.get("completed_at"),
+                call_alert.get("duration"),
+                call_alert.get("error_message"),
+                metadata_payload,
+            ),
+        )
+        conn.commit()
+    return int(cursor.lastrowid)
+
+
+def update_call_alert_status(
+    call_sid: str,
+    status: str,
+    duration: int | None = None,
+    completed_at: str | None = None,
+    error_message: str | None = None,
+) -> bool:
+    with get_connection() as conn:
+        updates = ["status = ?"]
+        params: list[Any] = [status]
+        if duration is not None:
+            updates.append("duration = ?")
+            params.append(duration)
+        if completed_at is not None:
+            updates.append("completed_at = ?")
+            params.append(completed_at)
+        if error_message is not None:
+            updates.append("error_message = ?")
+            params.append(error_message)
+
+        params.append(call_sid)
+        query = f"UPDATE call_alerts SET {', '.join(updates)} WHERE call_sid = ?"
+        cursor = conn.execute(query, params)
+        conn.commit()
+    return cursor.rowcount > 0
+
+
+def get_call_alerts(
+    limit: int = 50,
+    offset: int = 0,
+    incident_id: str | None = None,
+) -> tuple[list[dict[str, Any]], int]:
+    with get_connection() as conn:
+        query = "SELECT * FROM call_alerts WHERE 1=1"
+        params: list[Any] = []
+        if incident_id:
+            query += " AND incident_id = ?"
+            params.append(incident_id)
+
+        count_query = f"SELECT COUNT(*) FROM ({query})"
+        total = conn.execute(count_query, params).fetchone()[0]
+
+        query += " ORDER BY call_id DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        rows = conn.execute(query, params).fetchall()
+
+    items = []
+    for r in rows:
+        item = dict(r)
+        item["metadata"] = json.loads(item["metadata"]) if item.get("metadata") else {}
+        items.append(item)
+    return items, total
+
+
+def get_call_alert_by_sid(call_sid: str) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM call_alerts WHERE call_sid = ?",
+            (call_sid,),
+        ).fetchone()
+    if not row:
+        return None
+    item = dict(row)
+    item["metadata"] = json.loads(item["metadata"]) if item.get("metadata") else {}
+    return item
+
+
+def get_call_alert_by_id(call_id: int) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM call_alerts WHERE call_id = ?",
+            (call_id,),
+        ).fetchone()
+    if not row:
+        return None
+    item = dict(row)
+    item["metadata"] = json.loads(item["metadata"]) if item.get("metadata") else {}
+    return item
+
+
+def get_last_call_for_incident(incident_id: str) -> dict[str, Any] | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM call_alerts WHERE incident_id = ? ORDER BY call_id DESC LIMIT 1",
+            (incident_id,),
+        ).fetchone()
+    if not row:
+        return None
+    item = dict(row)
+    item["metadata"] = json.loads(item["metadata"]) if item.get("metadata") else {}
+    return item
+
+
+def get_calls_for_incident(incident_id: str) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM call_alerts WHERE incident_id = ? ORDER BY call_id ASC",
+            (incident_id,),
+        ).fetchall()
+    items = []
+    for r in rows:
+        item = dict(r)
+        item["metadata"] = json.loads(item["metadata"]) if item.get("metadata") else {}
+        items.append(item)
+    return items
 
 
 init_db()

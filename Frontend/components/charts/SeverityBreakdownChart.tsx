@@ -23,10 +23,10 @@ interface SeverityBreakdownChartProps {
 }
 
 const COLORS: Record<string, string> = {
-  CRITICAL: "#ef4444",
-  HIGH: "#ab4f0b",
-  MEDIUM: "#9b6208",
-  LOW: "#22c55e",
+  CRITICAL: "#DC2626",
+  HIGH: "#D97706",
+  MEDIUM: "#3FD0C9",
+  LOW: "#2EAF7D",
 };
 
 export function SeverityBreakdownChart({
@@ -57,7 +57,7 @@ export function SeverityBreakdownChart({
     return (
       <div
         style={{ height }}
-        className="w-full bg-[#ffffff] rounded-none flex items-center justify-center text-xs font-sans text-[#716c60]"
+        className="w-full bg-white rounded-[4px] flex items-center justify-center text-xs font-sans text-[#486966]"
       >
         Loading breakdown...
       </div>
@@ -78,27 +78,28 @@ export function SeverityBreakdownChart({
             {data.map((entry) => (
               <Cell
                 key={`cell-${entry.name}`}
-                fill={COLORS[entry.name] || "#bd7b12"}
-                stroke="#716c60"
+                fill={COLORS[entry.name] || "#2EAF7D"}
+                stroke="#FFFFFF"
                 strokeWidth={2}
               />
             ))}
           </Pie>
           <Tooltip
             contentStyle={{
-              backgroundColor: "#27251f",
-              borderColor: "#ded7ca",
-              borderRadius: "0",
+              backgroundColor: "#FFFFFF",
+              borderColor: "#D5EAE5",
+              borderRadius: "2px",
               fontSize: "12px",
               fontFamily: "monospace",
-              color: "#27251f",
+              color: "#02353C",
+              boxShadow: "0 4px 12px rgba(2, 53, 60, 0.08)",
             }}
           />
           <Legend
             verticalAlign="bottom"
             height={36}
             formatter={(value) => (
-              <span className="text-xs font-sans text-[#716c60] mr-2">
+              <span className="text-[11px] font-sans text-[#02353C] uppercase font-semibold mr-2">
                 {value}
               </span>
             )}
@@ -108,3 +109,4 @@ export function SeverityBreakdownChart({
     </div>
   );
 }
+

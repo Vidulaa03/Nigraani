@@ -31,12 +31,20 @@ from typing import Any, BinaryIO, Callable
 
 from prometheus_client import start_http_server
 
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
+
 import backend.database as database
 from backend.database import (
     DB_PATH,
     get_events_by_ids,
     get_events_since,
     get_ip_events_between,
+    get_last_call_for_incident,
     get_max_event_id,
     insert_decision,
     insert_detection,
@@ -50,6 +58,8 @@ from backend.detection import (
 )
 from backend.detection.risk_engine import compute_risk
 from backend.event_recovery import replay_spool
+from backend.notification_service import evaluate_and_notify_incident
+from backend.twilio_service import initiate_voice_alert
 from backend.ml.anomaly_detector import AnomalyDetector, ModelNotFoundError
 from backend.metrics import (
     ANALYSIS_DURATION,
@@ -80,6 +90,11 @@ LOOKBACK_MICROSECONDS = int(
 MAX_TRACKED_IDS = 50_000
 MAX_BACKOFF_SECONDS = 60.0
 _CURSOR_VERSION = 1
+# Notifications and calls only for decisions about recent traffic, so backlog
+# processing, cursor resets, and spool replays never alert on old incidents.
+ALERT_MAX_AGE = timedelta(
+    seconds=float(os.environ.get("NIGRAANI_ALERT_MAX_AGE_SECONDS") or 300)
+)
 
 _RECENT_EVENTS_BY_IP: dict[str, list[dict[str, Any]]] = {}
 
@@ -361,6 +376,48 @@ def _merge_recent(
     )
 
 
+def _alert_incident(
+    ip: str,
+    decision_id: int,
+    decision: dict[str, Any],
+    detections: list[dict[str, Any]],
+    window_events: list[dict[str, Any]],
+) -> None:
+    """In-app notification and Twilio voice alert for a saved decision.
+
+    Runs after insert_decision, so a retried batch reuses the same decision_id:
+    the notification is deduplicated by its idempotency key and the call by the
+    existing call for that incident. Alert failures never fail the analysis.
+    """
+    newest = max(map(_event_timestamp, window_events))
+    if datetime.now(timezone.utc) - newest > ALERT_MAX_AGE:
+        logger.info(
+            "Decision %s covers events up to %s; historical, so no notification or call",
+            decision_id, newest.isoformat(),
+        )
+        return
+    incident_id = f"decision-{decision_id}"
+    alert_decision = {**decision, "ip": ip}
+    endpoint = next((e.get("endpoint") for e in reversed(window_events) if e.get("endpoint")), None)
+    notification = None
+    try:
+        notification = evaluate_and_notify_incident(alert_decision, detections, incident_id=incident_id)
+    except Exception:
+        logger.exception("Notification creation failed for %s", incident_id)
+    try:
+        if get_last_call_for_incident(incident_id) is not None:
+            return  # one call per incident; a retry or re-analysis must not call again
+        initiate_voice_alert(
+            incident_id=incident_id,
+            decision=alert_decision,
+            detections=detections,
+            notification_id=notification.get("notification_id") if notification else None,
+            endpoint=endpoint,
+        )
+    except Exception:
+        logger.exception("Voice alert failed for %s", incident_id)
+
+
 def _analyze_window(
     ip: str,
     window_events: list[dict[str, Any]],
@@ -408,7 +465,7 @@ def _analyze_window(
                     lambda d=detector, s=severity_band: DETECTIONS.labels(d, s).inc()
                 )
 
-        insert_decision(
+        decision_id = insert_decision(
             {
                 "ip": ip,
                 "risk_score": decision["risk_score"],
@@ -419,6 +476,7 @@ def _analyze_window(
                 "event_ids": [int(event["event_id"]) for event in window_events],
             }
         )
+        _alert_incident(ip, decision_id, decision, detections, window_events)
         if decision["action"] in {"ALLOW", "MONITOR", "THROTTLE", "BLOCK"}:
             record_metric(lambda: RISK_DECISIONS.labels(decision["action"]).inc())
         record_metric(lambda: RISK_SCORE.observe(decision["risk_score"]))

@@ -12,34 +12,35 @@ export function StatusPill({ status, label, className }: StatusPillProps) {
   const isWarn = ["degraded", "waiting"].includes(status);
 
   const dotColor = isOk
-    ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"
+    ? "bg-[#2EAF7D]"
     : isWarn
-    ? "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
-    : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]";
+    ? "bg-amber-500"
+    : "bg-red-600";
 
   const textColor = isOk
-    ? "text-emerald-700"
+    ? "text-emerald-800"
     : isWarn
     ? "text-amber-800"
     : "text-red-700";
 
   const bgColor = isOk
-    ? "bg-emerald-950/20 border-emerald-500/20"
+    ? "bg-emerald-50 border-emerald-200"
     : isWarn
-    ? "bg-amber-950/20 border-amber-500/20"
-    : "bg-red-950/20 border-red-500/20";
+    ? "bg-amber-50 border-amber-200"
+    : "bg-red-50 border-red-200";
 
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-2 px-2.5 py-1 rounded-none text-xs font-sans font-medium uppercase tracking-wider border",
+        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[2px] text-[11px] font-sans font-semibold uppercase tracking-wider border",
         bgColor,
         textColor,
         className
       )}
     >
-      <span className={cn("w-2 h-2 rounded-none", dotColor)} />
+      <span className={cn("w-1.5 h-1.5 rounded-full", dotColor)} />
       {label || status.toUpperCase()}
     </div>
   );
 }
+

@@ -10,3 +10,4 @@ plotly
 prometheus-client>=0.20,<1
 google-genai>=1.0,<2
 python-dotenv>=1.0,<2
+twilio>=9.0.0

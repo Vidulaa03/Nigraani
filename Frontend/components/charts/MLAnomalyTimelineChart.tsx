@@ -70,7 +70,7 @@ export function MLAnomalyTimelineChart({
     return (
       <div
         style={{ height }}
-        className="w-full bg-[#ffffff] rounded-none flex items-center justify-center text-xs font-sans text-[#716c60]"
+        className="w-full bg-[#FFFFFF] rounded-sm flex items-center justify-center text-xs font-sans text-[#486966]"
       >
         Loading ML timeline...
       </div>
@@ -84,29 +84,30 @@ export function MLAnomalyTimelineChart({
           data={chartData}
           margin={{ top: 15, right: 15, left: -20, bottom: 0 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#716c60" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#D5EAE5" vertical={false} />
           <XAxis
             dataKey="time"
-            stroke="#716c60"
+            stroke="#486966"
             fontSize={10}
             tickLine={false}
-            axisLine={{ stroke: "#716c60" }}
+            axisLine={{ stroke: "#D5EAE5" }}
           />
           <YAxis
             domain={[0, 100]}
-            stroke="#716c60"
+            stroke="#486966"
             fontSize={10}
             tickLine={false}
-            axisLine={{ stroke: "#716c60" }}
+            axisLine={{ stroke: "#D5EAE5" }}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#27251f",
-              borderColor: "#ded7ca",
-              borderRadius: "0",
+              backgroundColor: "#FFFFFF",
+              borderColor: "#D5EAE5",
+              borderRadius: "4px",
               fontSize: "12px",
-              fontFamily: "monospace",
-              color: "#27251f",
+              fontFamily: "var(--font-geist-mono), monospace",
+              color: "#02353C",
+              boxShadow: "0 2px 8px rgba(2, 53, 60, 0.08)",
             }}
             formatter={(value: any, name: any, props: any) => [
               `Score: ${value} (IP: ${props.payload.ip})`,
@@ -115,11 +116,11 @@ export function MLAnomalyTimelineChart({
           />
           <ReferenceLine
             y={50}
-            stroke="#9b6208"
+            stroke="#D97706"
             strokeDasharray="4 4"
             label={{
               value: "Decision Threshold (50)",
-              fill: "#9b6208",
+              fill: "#D97706",
               fontSize: 10,
               position: "top",
             }}
@@ -128,7 +129,7 @@ export function MLAnomalyTimelineChart({
             type="monotone"
             dataKey="score"
             name="ML Anomaly Score"
-            stroke="#7058a3"
+            stroke="#2EAF7D"
             strokeWidth={2}
             dot={(props: any) => {
               const isAnom = props.payload.isAnomalous;
@@ -138,8 +139,8 @@ export function MLAnomalyTimelineChart({
                   cx={props.cx}
                   cy={props.cy}
                   r={isAnom ? 4 : 2.5}
-                  fill={isAnom ? "#ef4444" : "#7058a3"}
-                  stroke={isAnom ? "#fecaca" : "#d8b4fe"}
+                  fill={isAnom ? "#DC2626" : "#2EAF7D"}
+                  stroke={isAnom ? "#FEE2E2" : "#D5EAE5"}
                   strokeWidth={1}
                 />
               );

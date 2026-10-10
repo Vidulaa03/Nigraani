@@ -29,6 +29,24 @@ os.environ["NIGRAANI_LOG_DIR"] = str(_SESSION_DIR / "logs")
 os.environ["NIGRAANI_EVENT_SPOOL_PATH"] = str(_SESSION_DIR / "logs" / "event_recovery_spool.jsonl")
 # The cursor defaults to a file next to the (temporary) database.
 os.environ.pop("NIGRAANI_ANALYZER_CURSOR_PATH", None)
+# Never place real Twilio calls from tests, and never let the developer's real
+# .env change test behaviour: every alerting setting gets a fixed test value
+# here, and load_dotenv() does not replace variables that are already set.
+# Tests that exercise calling provide fake credentials and a mocked client.
+os.environ.update(
+    {
+        "TWILIO_ACCOUNT_SID": "",
+        "TWILIO_AUTH_TOKEN": "",
+        "TWILIO_FROM_NUMBER": "",
+        "TWILIO_TO_NUMBER": "",
+        "TWILIO_CALLBACK_BASE_URL": "",
+        "TWILIO_TRIAL_MODE": "false",
+        "TWILIO_VOICE_ENABLED": "true",
+        "TWILIO_MIN_SEVERITY": "80",
+        "TWILIO_COOLDOWN_SECONDS": "300",
+        "NOTIFICATION_MIN_SEVERITY": "50",
+    }
+)
 
 
 def fingerprint_real_data() -> dict[Path, str | None]:

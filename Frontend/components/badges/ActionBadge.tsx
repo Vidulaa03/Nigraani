@@ -20,7 +20,7 @@ export function ActionBadge({ action, className, size = "md" }: ActionBadgeProps
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-center rounded-none font-sans uppercase tracking-wider border",
+        "inline-flex items-center justify-center rounded-[2px] font-sans uppercase tracking-wider border font-semibold",
         sizeClass,
         style.bg,
         style.text,
